@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc/spec-desktop-shell",
+    "types": ["jest", "node"]
+  },
+  "include": ["src/**/*.spec.ts"],
+  "exclude": ["src/main.ts"]
+}

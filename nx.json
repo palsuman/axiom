@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "npmScope": "nexus",
+  "affected": {
+    "defaultBase": "origin/main"
+  },
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "sharedGlobals": []
+  },
+  "tasksRunnerOptions": {
+    "default": {
+      "runner": "./tools/tasks-runners/nexus-default.js",
+      "options": {
+        "cacheableOperations": ["build", "lint", "test", "typecheck"],
+        "parallel": 3,
+        "remoteCacheOptions": {
+          "remoteDirEnv": "NEXUS_REMOTE_CACHE_DIR",
+          "defaultRemoteDir": ".nexus/cache"
+        }
+      }
+    }
+  },
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"]
+    }
+  },
+  "projects": {
+    "workbench": "apps/workbench",
+    "desktop-shell": "apps/desktop-shell",
+    "platform": "packages/platform",
+    "icons": "packages/icons"
+  }
+}

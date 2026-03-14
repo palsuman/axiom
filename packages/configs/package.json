@@ -1,0 +1,7 @@
+{
+  "name": "@nexus/configs",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared lint, format, and test configs for the Nexus IDE monorepo",
+  "main": "index.js"
+}

@@ -1,0 +1,44 @@
+{
+  "name": "nexus",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "nx": "nx",
+    "workbench:build": "nx run workbench:build",
+    "desktop-shell:build": "nx run desktop-shell:build",
+    "lint": "nx run-many --target=lint",
+    "test": "nx run-many --target=test",
+    "typecheck": "nx run-many --target=build --configuration=production"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*",
+    "extensions/*",
+    "docs",
+    "tasks"
+  ],
+  "packageManager": "yarn@1.22.22",
+  "dependencies": {
+    "chokidar": "3.5.3",
+    "ignore": "5.3.1",
+    "node-pty": "1.1.0",
+    "xterm": "5.3.0",
+    "xterm-addon-fit": "0.8.0"
+  },
+  "devDependencies": {
+    "@nx/workspace": "19.0.0",
+    "@types/jest": "29.5.11",
+    "@types/node": "20.11.30",
+    "@typescript-eslint/eslint-plugin": "7.2.0",
+    "@typescript-eslint/parser": "7.2.0",
+    "dotenv": "16.4.5",
+    "electron": "29.1.2",
+    "eslint": "8.57.0",
+    "jest": "29.7.0",
+    "nx": "19.0.0",
+    "prettier": "3.2.5",
+    "ts-jest": "29.1.2",
+    "typescript": "5.4.2"
+  }
+}

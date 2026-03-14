@@ -1,0 +1,39 @@
+{
+  "name": "workbench",
+  "projectType": "application",
+  "sourceRoot": "apps/workbench/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/workbench"],
+      "options": {
+        "command": "node tools/scripts/run-with-env.mjs workbench:build tsc -p apps/workbench/tsconfig.app.json"
+      },
+      "configurations": {
+        "production": {
+          "env": {
+            "NEXUS_ENV": "production"
+          }
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/workbench/src --ext .ts"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config apps/workbench/jest.config.cjs --runInBand"
+      }
+    },
+    "watch": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/scripts/run-with-env.mjs workbench:watch tsc -p apps/workbench/tsconfig.app.json --watch"
+      }
+    }
+  }
+}

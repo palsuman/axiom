@@ -1,0 +1,11 @@
+{
+  "extends": "./packages/configs/ts/tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@nexus/platform/*": ["packages/platform/*"],
+      "@nexus/contracts/*": ["packages/contracts/*"],
+      "@nexus/icons/*": ["packages/icons/*"]
+    }
+  }
+}

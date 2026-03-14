@@ -1,0 +1,45 @@
+{
+  "name": "desktop-shell",
+  "projectType": "application",
+  "sourceRoot": "apps/desktop-shell/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/desktop-shell"],
+      "options": {
+        "command": "node tools/scripts/run-with-env.mjs desktop-shell:build tsc -p apps/desktop-shell/tsconfig.app.json"
+      },
+      "configurations": {
+        "production": {
+          "env": {
+            "NEXUS_ENV": "production"
+          }
+        }
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/desktop-shell/src --ext .ts"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config apps/desktop-shell/jest.config.cjs --runInBand"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "yarn nx run desktop-shell:build && ./node_modules/.bin/electron dist/apps/desktop-shell/main.js"
+      }
+    },
+    "watch": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/scripts/run-with-env.mjs desktop-shell:watch tsc -p apps/desktop-shell/tsconfig.app.json --watch"
+      }
+    }
+  }
+}

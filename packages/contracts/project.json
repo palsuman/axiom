@@ -1,0 +1,19 @@
+{
+  "name": "contracts",
+  "projectType": "library",
+  "sourceRoot": "packages/contracts",
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config packages/contracts/jest.config.cjs --runInBand"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint packages/contracts --ext .ts"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/apps/desktop-shell",
+    "sourceMap": true,
+    "inlineSources": true,
+    "types": ["node", "electron"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["**/*.spec.ts", "src/test-utils/**/*"]
+}

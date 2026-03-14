@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/packages/icons",
+    "types": ["node", "jest"],
+    "moduleResolution": "node"
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["**/*.d.ts"]
+}
