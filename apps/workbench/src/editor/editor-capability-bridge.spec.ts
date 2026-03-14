@@ -1,4 +1,4 @@
-import { CommandRegistry } from '../command-registry';
+import { CommandRegistry } from '../commands/command-registry';
 import { EditorCapabilityBridge } from './editor-capability-bridge';
 import type { MonacoEditorInstance } from './monaco-types';
 

@@ -2,5 +2,5 @@
   "name": "@nexus/platform",
   "version": "0.0.1",
   "private": true,
-  "main": "env.ts"
+  "main": "config/env.ts"
 }

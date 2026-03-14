@@ -9,7 +9,7 @@
    - Command registry + palette service supply fuzzy-searched quick open across commands/recent files, honoring keybindings + locale metadata and driving the renderer command palette UI.
 3. **Shared Packages**
    - `packages/contracts`: TypeScript interfaces for IPC, extension APIs, prompt schemas.
-   - `packages/platform`: workspace models, state stores, indexing clients.
+   - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `workspace`, `settings`, `theming`, `windowing`, `scm`).
    - `packages/ui-kit`: reusable Angular components + theme tokens.
    - `packages/editor-adapter`: Monaco configuration, model lifecycle helpers.
    - `packages/ai-core`: llama.cpp orchestration SDK, prompt DSL, telemetry hooks.
@@ -70,3 +70,51 @@
 ## Docs & Governance
 - Architecture decisions captured in ADRs (`docs/adr/ADR-XXXX.md`).
 - Product, architecture, monorepo, milestones, and tracker docs kept in repo root for transparency.
+- Execution rules and structure standards live in `AGENTS.md` and `docs/governance/engineering-standards.md`.
+
+## Package Organization Rules
+- Shared packages use domain-first folders. Feature files should not accumulate at package roots.
+- Cross-cutting capabilities should expose canonical shared modules before feature-level adoption.
+- `packages/platform` currently uses:
+  - `config`
+  - `explorer`
+  - `filesystem`
+  - `scm/git`
+  - `settings`
+  - `theming`
+  - `windowing`
+  - `workspace`
+- Root-level files in shared packages should be limited to metadata, config, and deliberate package entrypoints.
+
+## App Organization Rules
+- Applications follow the same domain-first rule as shared packages. Root `main.ts` and `preload.ts` files are allowed only as deliberate entrypoints.
+- `apps/desktop-shell/src` currently uses:
+  - `bootstrap`
+  - `filesystem`
+  - `preload`
+  - `scm`
+  - `system`
+  - `terminal`
+  - `windowing`
+  - `workspace`
+- `apps/workbench/src` currently uses:
+  - `boot`
+  - `commands`
+  - `editor`
+  - `explorer`
+  - `i18n`
+  - `scm`
+  - `settings`
+  - `shell`
+  - `terminal`
+  - `workspace`
+- Within `apps/workbench/src`, large composition or shell files should be split again once they start mixing distinct responsibilities.
+- The current renderer split is:
+  - `boot/bootstrap-workbench.ts` as a thin entry module
+  - `boot/workbench-bootstrap-context.ts` for service composition
+  - `boot/workbench-bootstrap-contributions.ts` for shell/view/status providers
+  - `boot/workbench-bootstrap-commands.ts` for command registration
+  - `boot/workbench-bootstrap-runtime.ts` for terminal mount, workspace restore, and SCM startup
+  - `shell/workbench-shell.ts` as a facade over shell state, layout, and notification helpers
+  - `shell/workbench-shell-contract.ts`, `shell/workbench-shell-state.ts`, and `shell/workbench-shell-layout.ts` for focused shell internals
+- App roots should not become feature buckets. If a subsystem grows beyond a single file, create a domain folder before the layout drifts.

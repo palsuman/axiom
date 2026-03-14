@@ -19,7 +19,7 @@
 - Electron/Node processes should import a central `env.ts` helper (to be implemented) that reads env vars, provides defaults, and validates required values.
 
 ## Validation Strategy
-1. Build `packages/platform/env.ts` exporting `readEnv()` that throws if required variables missing or invalid.
+1. Build `packages/platform/config/env.ts` exporting `readEnv()` that throws if required variables missing or invalid.
 2. Unit test env parsing once the helper exists.
 3. During packaging, ensure `.env` is optional; production builds rely on OS env injection or config files.
 

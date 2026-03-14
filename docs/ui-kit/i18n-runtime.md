@@ -1,21 +1,23 @@
 # i18n Runtime + Locale Switcher
 
-`IDE-181` adds the MVP localization runtime for the workbench and wires the existing `workbench.locale` setting into live UI behavior.
+`IDE-181` adds the localization runtime for the workbench and wires the existing `workbench.locale` setting into live UI behavior.
 
 ## Runtime architecture
 
-- [apps/workbench/src/i18n-service.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/i18n-service.ts) provides:
+- [apps/workbench/src/i18n/i18n-service.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/i18n/i18n-service.ts) provides:
   - translation bundle registration
   - locale change listeners
   - fallback resolution
   - `{placeholder}` interpolation
   - locale display names for the workbench switcher
-- [apps/workbench/src/settings-service.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/settings-service.ts) now drives the runtime locale from the persisted `workbench.locale` user setting.
-- [apps/workbench/src/workbench-layout-store.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/workbench-layout-store.ts) passes the shared i18n runtime into the bootstrapped shell so persisted layout state and runtime locale stay in sync.
+- [apps/workbench/src/settings/settings-service.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/settings/settings-service.ts) now drives the runtime locale from the persisted `workbench.locale` user setting.
+- [apps/workbench/src/shell/workbench-layout-store.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/shell/workbench-layout-store.ts) passes the shared i18n runtime into the bootstrapped shell so persisted layout state and runtime locale stay in sync.
+- [apps/workbench/src/boot/workbench-bootstrap-contributions.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/boot/workbench-bootstrap-contributions.ts) owns locale-aware quick-open providers and status bar bindings, keeping i18n-facing shell contributions out of the root bootstrap module.
+- [apps/workbench/src/boot/workbench-bootstrap-commands.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/boot/workbench-bootstrap-commands.ts) registers locale commands separately from service composition and runtime startup.
 
 ## Supported locales
 
-The MVP runtime ships with:
+The runtime ships with:
 
 - `en-US`
 - `fr-FR`
@@ -34,7 +36,13 @@ The runtime currently localizes:
 - locale switch notifications
 - quick-open entries for workspace open and language switching
 
-`main.ts` registers:
+`apps/workbench/src/boot/bootstrap-workbench.ts` now delegates to focused boot modules:
+
+- `workbench-bootstrap-contributions.ts` for locale switcher quick-open entries and locale/status bar bindings
+- `workbench-bootstrap-commands.ts` for `nexus.locale.switch` and `nexus.locale.cycle`
+- `workbench-bootstrap-runtime.ts` for runtime startup after commands and providers are wired
+
+The composed bootstrap registers:
 
 - `nexus.locale.switch` for explicit locale changes
 - `nexus.locale.cycle` for cycling between supported locales
@@ -54,4 +62,4 @@ Add a new locale by:
 ## Verification
 
 - `yarn nx run workbench:test`
-- `./node_modules/.bin/eslint apps/workbench/src/i18n-service.ts apps/workbench/src/main.ts apps/workbench/src/settings-service.ts apps/workbench/src/command-palette.ts apps/workbench/src/workbench-shell.ts apps/workbench/src/notification-center.ts apps/workbench/src/command-registry.ts apps/workbench/src/workbench-layout-store.ts`
+- `./node_modules/.bin/eslint apps/workbench/src/i18n/i18n-service.ts apps/workbench/src/boot/bootstrap-workbench.ts apps/workbench/src/boot/workbench-bootstrap-contributions.ts apps/workbench/src/boot/workbench-bootstrap-commands.ts apps/workbench/src/settings/settings-service.ts apps/workbench/src/commands/command-palette.ts apps/workbench/src/shell/workbench-shell.ts apps/workbench/src/shell/workbench-shell-layout.ts apps/workbench/src/shell/notification-center.ts apps/workbench/src/commands/command-registry.ts apps/workbench/src/shell/workbench-layout-store.ts`

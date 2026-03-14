@@ -7,28 +7,31 @@
 ## Architecture
 
 ### Desktop Shell
-- `apps/desktop-shell/src/terminal-service.ts`
+- `apps/desktop-shell/src/terminal/terminal-service.ts`
   - Wraps `node-pty` and tracks terminals per window session + webContents id.
   - Emits `data` and `exit` events that are forwarded over IPC (`nexus:terminal:data`, `nexus:terminal:exit`) only to the owning renderer.
   - Supports create/write/resize/dispose plus session teardown handling (`disposeBySession`).
-- IPC handlers in `apps/desktop-shell/src/main.ts`
+- IPC handlers in `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`
   - `nexus:terminal:create`, `write`, `resize`, `dispose` map directly to the service.
   - Session removal automatically closes orphan PTYs to prevent leaks.
 
 ### Preload Bridge
 - `apps/desktop-shell/src/preload.ts`
+  - Thin entrypoint delegating to `apps/desktop-shell/src/preload/nexus-bridge.ts`.
   - Exposes promise-based helpers (`terminalCreate`, `terminalWrite`, etc.).
   - Provides event hooks `onTerminalData` / `onTerminalExit` that multiplex renderer listeners and keep the bridge typed.
 
 ### Renderer
-- `apps/workbench/src/terminal-client.ts`
+- `apps/workbench/src/terminal/terminal-client.ts`
   - Thin wrapper around the preload bridge for easier mocking in tests.
-- `apps/workbench/src/terminal-host.ts`
+- `apps/workbench/src/terminal/terminal-host.ts`
   - Uses `xterm` + `fit` addon to render a terminal surface inside the workbench panel area.
   - Handles theme awareness, resizing, cleanup, and forwards keyboard input to the PTY.
-- `apps/workbench/src/main.ts`
+- `apps/workbench/src/boot/workbench-bootstrap-runtime.ts`
   - Mounts a default terminal surface when running in a browser context and wires lifecycle disposal.
-  - Registers Git/terminal commands so panels and future UI can control commit and history features consistently.
+  - Attaches the terminal host to hot-exit persistence during runtime startup.
+- `apps/workbench/src/boot/bootstrap-workbench.ts`
+  - Remains the thin renderer entry module delegating to context, contribution, command, and runtime bootstrap pieces.
 
 ## Contracts
 Defined in `packages/contracts/ipc.ts`:

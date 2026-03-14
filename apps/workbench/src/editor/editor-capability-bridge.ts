@@ -1,4 +1,4 @@
-import { CommandRegistry } from '../command-registry';
+import { CommandRegistry } from '../commands/command-registry';
 import type { MonacoEditorInstance } from './monaco-types';
 
 export type EditorCapabilityTelemetry =

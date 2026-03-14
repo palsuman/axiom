@@ -35,7 +35,7 @@ Nexus relies on a strict set of environment variables so every service, extensio
 
 ## Storage layout & migrations
 
-- `packages/platform/storage-layout.ts` exposes `ensureStorageLayout(env)` which:
+- `packages/platform/workspace/storage-layout.ts` exposes `ensureStorageLayout(env)` which:
   - Resolves absolute paths for `NEXUS_HOME`, `NEXUS_DATA_DIR`, and `NEXUS_WORKSPACE_DATA`.
   - Creates directories if missing.
   - Reads `~/.nexus-meta.json` to determine the last known locations.

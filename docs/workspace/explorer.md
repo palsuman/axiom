@@ -29,8 +29,8 @@
 
 ## File operations & undo pipeline (IDE-035)
 
-1. **Engine** – `packages/platform/file-operations.ts` (`FileOperationsEngine`) owns all filesystem mutations. Every request carries the current workspace roots so operations cannot escape the project boundary. Paths are normalized and validated before touching disk.
-2. **Electron service** – `apps/desktop-shell/src/file-operations.ts` wires IPC channels (`nexus:fs:create|rename|move|copy|delete|undo`) to the engine, resolving the correct workspace roots for each window.
+1. **Engine** – `packages/platform/filesystem/file-operations.ts` (`FileOperationsEngine`) owns all filesystem mutations. Every request carries the current workspace roots so operations cannot escape the project boundary. Paths are normalized and validated before touching disk.
+2. **Electron service** – `apps/desktop-shell/src/filesystem/file-operations.ts` wires IPC channels (`nexus:fs:create|rename|move|copy|delete|undo`) to the engine, resolving the correct workspace roots for each window.
 3. **Trash + undo** – Deletes move items into `<NEXUS_WORKSPACE_DATA>/trash/<batch-id>/…` instead of removing them permanently. Each operation returns an `undoToken`; calling `fsUndo` replays the inverse action (e.g., move back from trash, rename to the previous location, remove copied artifacts). Tokens expire after five minutes and stale trash batches are cleaned automatically.
 4. **Renderer bridge** – `ExplorerActions` wraps the `window.nexus` APIs, adds optimistic status via `ExplorerStore.addOptimisticPaths`, and clears the pending indicators once the IPC promise resolves. Even before chokidar events propagate, the UI can show “in-flight” state for touched resources.
 5. **Error handling** – All operations attempt best-effort rollbacks if intermediate steps fail (renames revert, copies are removed, trash batches are restored). Undo operations surface failures to the caller so the UI can prompt the user when a rollback is no longer possible (e.g., when another process mutated the same file).

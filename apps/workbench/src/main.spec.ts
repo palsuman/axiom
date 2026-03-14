@@ -112,7 +112,9 @@ describe('workbench shell bootstrap', () => {
 
   it('registers default layout when imported', async () => {
     jest.resetModules();
-    const module = await import('./main');
+    const module = await import('./main').catch(error => {
+      throw error instanceof Error ? error : new Error(String(error));
+    });
     const snapshot = module.shell.layoutSnapshot();
     expect(snapshot.activityBar.items.length).toBeGreaterThan(0);
     expect(snapshot.sidebar.views.length).toBeGreaterThan(0);

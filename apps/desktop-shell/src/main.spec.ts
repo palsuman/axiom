@@ -85,12 +85,12 @@ jest.mock('electron', () => {
   };
 });
 
-jest.mock('./logger', () => ({
+jest.mock('./system/logger', () => ({
   log: jest.fn(),
   logError: jest.fn()
 }));
 
-jest.mock('./window-manager', () => {
+jest.mock('./windowing/window-manager', () => {
   const state = {
     createWindow: jest.fn(() => ({ webContents: { id: 91 } })),
     focusLastActiveWindow: jest.fn(),
@@ -109,28 +109,28 @@ jest.mock('./window-manager', () => {
   };
 });
 
-jest.mock('./keymap-service', () => ({
+jest.mock('./windowing/keymap-service', () => ({
   KeymapService: jest.fn().mockImplementation(() => ({
     initialize: jest.fn(),
     dispose: jest.fn()
   }))
 }));
 
-jest.mock('./menu-service', () => ({
+jest.mock('./windowing/menu-service', () => ({
   MenuService: jest.fn().mockImplementation(() => ({
     install: jest.fn(),
     dispose: jest.fn()
   }))
 }));
 
-jest.mock('./association-service', () => ({
+jest.mock('./system/association-service', () => ({
   AssociationService: jest.fn().mockImplementation(() => ({
     registerProtocolHandlers: jest.fn(),
     parseDeepLink: jest.fn(() => undefined)
   }))
 }));
 
-jest.mock('./update-service', () => ({
+jest.mock('./system/update-service', () => ({
   UpdateService: jest.fn().mockImplementation(() => ({
     initialize: jest.fn(),
     checkForUpdates: jest.fn(),
@@ -138,24 +138,24 @@ jest.mock('./update-service', () => ({
   }))
 }));
 
-jest.mock('./crash-service', () => ({
+jest.mock('./system/crash-service', () => ({
   CrashService: jest.fn().mockImplementation(() => ({
     initialize: jest.fn()
   }))
 }));
 
-jest.mock('./startup-metrics', () => ({
+jest.mock('./system/startup-metrics', () => ({
   StartupMetrics: jest.fn().mockImplementation(() => ({
     mark: jest.fn(),
     recordWindowReady: jest.fn()
   }))
 }));
 
-jest.mock('./workspace-dialog', () => ({
+jest.mock('./workspace/workspace-dialog', () => ({
   pickWorkspaceDirectory: jest.fn().mockResolvedValue(undefined)
 }));
 
-jest.mock('./file-operations', () => {
+jest.mock('./filesystem/file-operations', () => {
   const state = {
     create: jest.fn(),
     rename: jest.fn(),
@@ -171,7 +171,7 @@ jest.mock('./file-operations', () => {
   };
 });
 
-jest.mock('./git-repository-service', () => {
+jest.mock('./scm/git-repository-service', () => {
   const state = {
     commit: jest.fn(),
     detachSession: jest.fn(),
@@ -191,7 +191,7 @@ jest.mock('./git-repository-service', () => {
   };
 });
 
-jest.mock('./terminal-service', () => {
+jest.mock('./terminal/terminal-service', () => {
   const state = {
     createTerminal: jest.fn(),
     dispose: jest.fn(),
@@ -207,20 +207,20 @@ jest.mock('./terminal-service', () => {
   };
 });
 
-jest.mock('@nexus/platform/workspace-history', () => ({
+jest.mock('@nexus/platform/workspace/workspace-history', () => ({
   WorkspaceHistoryStore: jest.fn().mockImplementation(() => ({
     list: jest.fn(() => []),
     record: jest.fn()
   }))
 }));
 
-jest.mock('@nexus/platform/storage-layout', () => ({
+jest.mock('@nexus/platform/workspace/storage-layout', () => ({
   ensureStorageLayout: jest.fn(() => ({
     migrations: []
   }))
 }));
 
-jest.mock('@nexus/platform/workspace-descriptor', () => ({
+jest.mock('@nexus/platform/workspace/workspace-descriptor', () => ({
   loadWorkspaceDescriptor: jest.fn((workspacePath: string) => ({
     descriptorPath: undefined,
     primary: workspacePath,
@@ -229,7 +229,7 @@ jest.mock('@nexus/platform/workspace-descriptor', () => ({
   }))
 }));
 
-jest.mock('@nexus/platform/workspace-backup', () => {
+jest.mock('@nexus/platform/workspace/workspace-backup', () => {
   const state = {
     clear: jest.fn(),
     load: jest.fn(),
@@ -279,10 +279,10 @@ describe('desktop shell main process', () => {
   });
 
   it('rejects invalid workspace payloads before opening windows', async () => {
-    const windowManager = jest.requireMock('./window-manager') as {
+    const windowManager = jest.requireMock('./windowing/window-manager') as {
       __mock: { openWorkspace: jest.Mock };
     };
-    const logger = jest.requireMock('./logger') as { logError: jest.Mock };
+    const logger = jest.requireMock('./system/logger') as { logError: jest.Mock };
 
     const handler = electron.getHandle('nexus:open-workspace');
 
@@ -295,7 +295,7 @@ describe('desktop shell main process', () => {
   });
 
   it('rejects invalid git stage payloads before repository access', async () => {
-    const gitRepository = jest.requireMock('./git-repository-service') as {
+    const gitRepository = jest.requireMock('./scm/git-repository-service') as {
       __mock: { stage: jest.Mock };
     };
 
@@ -308,7 +308,7 @@ describe('desktop shell main process', () => {
   });
 
   it('normalizes valid renderer logs and ignores malformed payloads', async () => {
-    const logger = jest.requireMock('./logger') as {
+    const logger = jest.requireMock('./system/logger') as {
       log: jest.Mock;
       logError: jest.Mock;
     };

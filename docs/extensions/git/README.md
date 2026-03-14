@@ -8,25 +8,25 @@
 ## Architecture
 
 ### Platform layer
-- `packages/platform/git/git-repository-manager.ts`
+- `packages/platform/scm/git/git-repository-manager.ts`
   - Scans each workspace root (configurable depth) for `.git` directories or `gitdir:` files.
   - Normalizes worktree roots and emits add/remove/change events.
   - Watches `HEAD` and `refs/heads/*` via `chokidar` to refresh branch information whenever commits switch.
   - Exposes `getRepositories()` so callers can snapshot the current list without mutating internal state.
-- `packages/platform/git/git-utils.ts`
+- `packages/platform/scm/git/git-utils.ts`
   - Handles `gitdir:` resolution, bare repo detection, repository id hashing, and safe HEAD parsing.
 
 ### Desktop shell
-- `apps/desktop-shell/src/git-repository-service.ts`
+- `apps/desktop-shell/src/scm/git-repository-service.ts`
   - Maintains a `GitRepositoryManager` per active window session.
   - Sessions are keyed by the WindowManager session id; whenever the workspace roots change, the service updates/creates the manager.
   - Repositories are cached in memory and surfaced through IPC (`nexus:git:list-repositories`).
-- `apps/desktop-shell/src/main.ts`
+- `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`
   - Tracks workspace lifecycle events (`onWindowReady`, session removal) to start/stop repository tracking.
   - IPC handler resolves the session associated with the requesting renderer and returns the latest repository list.
 
 ### Renderer
-- `apps/workbench/src/git-repository-store.ts`
+- `apps/workbench/src/scm/git-repository-store.ts`
   - Thin store that calls `window.nexus.gitListRepositories()` to hydrate SCM views.
   - Keeps an in-memory copy for consumers (status bar, future SCM panel).
 
@@ -62,17 +62,17 @@ type GitRepositoryInfo = {
 ## Architecture
 
 ### Platform layer
-- `packages/platform/git/git-status-service.ts`
+- `packages/platform/scm/git/git-status-service.ts`
   - Wraps `git status --porcelain`, `git add`, `git restore --staged`, and `git diff` via a hardened runner to avoid shell injection.
   - Parses porcelain output into typed `GitStatusSummary`/`GitStatusEntry` contracts (branch, upstream, ahead/behind, staged + working tree codes).
   - Computes diff summaries (additions/deletions) for quick badges in the UI.
   - Exported `parsePorcelainStatus` helper covered by unit tests with representative git output fixtures.
 
 ### Desktop shell
-- `apps/desktop-shell/src/git-repository-service.ts`
+- `apps/desktop-shell/src/scm/git-repository-service.ts`
   - Now depends on `GitStatusService` and exposes `getStatus`, `stage`, `unstage`, and `getDiff` per session/repository.
   - Validates the requesting session (`WindowManager` metadata) before delegating to ensure untrusted windows cannot access other workspaces.
-  - IPC handlers wired in `apps/desktop-shell/src/main.ts` for:
+  - IPC handlers wired in `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts` for:
     - `nexus:git:get-status`
     - `nexus:git:stage`
     - `nexus:git:unstage`
@@ -80,13 +80,17 @@ type GitRepositoryInfo = {
 
 ### Renderer
 - Contracts expanded in `packages/contracts/ipc.ts` to include `GitFileStatus`, `GitStatusSummary`, `GitStagePayload`, `GitDiffRequest`, and `GitDiffResponse`.
-- `apps/workbench/src/git-status-store.ts`
+- `apps/workbench/src/scm/git-status-store.ts`
   - Central store with derived `staged`/`workingTree` lists, diff selection, optimistic loading flags, and listeners for workbench views.
   - Stage/unstage helpers call the preload bridge and automatically reapply summaries for near-instant UI updates.
   - Selection API fetches diffs (staged or working tree) and caches the latest response for preview panes.
-- `apps/workbench/src/main.ts`
-  - Instantiates `GitRepositoryStore` + `GitStatusStore`, wires listener to update the status bar (`status.git`) with branch and staged/unstaged counts.
-  - Registers commands: `nexus.git.show`, `nexus.git.refreshStatus`, `nexus.git.stageAll`, `nexus.git.unstageAll`, and `nexus.git.focus` (activity view shortcut).
+- `apps/workbench/src/boot/workbench-bootstrap-context.ts`
+  - Instantiates `GitRepositoryStore` + `GitStatusStore` + commit/history stores as part of renderer service composition.
+- `apps/workbench/src/boot/workbench-bootstrap-contributions.ts`
+  - Wires the Git status bar item (`status.git`) so branch and staged/unstaged counts track store updates.
+- `apps/workbench/src/boot/workbench-bootstrap-commands.ts`
+  - Registers `nexus.git.show`, `nexus.git.refreshStatus`, `nexus.git.stageAll`, `nexus.git.unstageAll`, and `nexus.git.focus`.
+- `apps/workbench/src/boot/workbench-bootstrap-runtime.ts`
   - Automatically hydrates the first discovered repository on boot so SCM data is visible without manual refresh.
 
 ## API
@@ -149,11 +153,11 @@ type GitDiffResponse = {
 ## Architecture
 
 ### Platform layer
-- `packages/platform/git/git-commit-service.ts`
+- `packages/platform/scm/git/git-commit-service.ts`
   - Wraps `git commit`, `git log`, and follow-up head description commands.
   - Uses structured outputs (custom separators) to parse history into stable DTOs without relying on locale-sensitive text.
   - Enforces message presence, clamps history limits, and supports optional `--signoff`, `--amend`, and `--allow-empty`.
-- `apps/desktop-shell/src/git-repository-service.ts`
+- `apps/desktop-shell/src/scm/git-repository-service.ts`
   - Delegates `commit` and `getHistory` calls to the commit service and exposes them through the per-session repository manager.
 - IPC additions:
   - `nexus:git:commit` ←→ `GitCommitPayload` / `GitCommitResult`
@@ -164,9 +168,10 @@ type GitDiffResponse = {
 - Stores:
   - `GitCommitStore` manages draft state (message, sign-off, amend), dispatches commits, tracks last result/error.
   - `GitHistoryStore` handles paging/filtering for log entries and provides snapshots to Angular views.
-- `apps/workbench/src/main.ts`
-  - Instantiates both stores, wires them into repository selection (set active repo + refresh history).
-  - Registers commands (`nexus.git.setCommitMessage`, `nexus.git.commit`, `nexus.git.toggleSignOff`, `nexus.git.toggleAmend`, `nexus.git.refreshHistory`) so UI surfaces and automations share a common API.
+- `apps/workbench/src/boot/workbench-bootstrap-context.ts`
+  - Instantiates commit/history stores alongside repository/status stores so SCM runtime state has one composition root.
+- `apps/workbench/src/boot/workbench-bootstrap-commands.ts`
+  - Registers `nexus.git.setCommitMessage`, `nexus.git.commit`, `nexus.git.toggleSignOff`, `nexus.git.toggleAmend`, and `nexus.git.refreshHistory`.
   - Refreshes status + history after every commit to keep panels consistent.
 
 ## API

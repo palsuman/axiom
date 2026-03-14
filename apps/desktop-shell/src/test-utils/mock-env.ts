@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { NexusEnv } from '@nexus/platform/env';
+import type { NexusEnv } from '@nexus/platform/config/env';
 
 export function createMockEnv(overrides: Partial<NexusEnv> = {}): NexusEnv {
   const tmpHome = overrides.nexusHome ?? fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-home-'));

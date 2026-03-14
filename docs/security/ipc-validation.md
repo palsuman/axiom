@@ -2,7 +2,7 @@
 
 ## Scope
 - Shared validators live in `packages/contracts/ipc-validation.ts`.
-- Electron main-process enforcement lives in `apps/desktop-shell/src/main.ts`.
+- Electron main-process enforcement lives in `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`.
 - Coverage includes all current payload-bearing desktop IPC channels: workspace launch, Git, terminal, file operations, workspace backup, and renderer logging.
 
 ## Design

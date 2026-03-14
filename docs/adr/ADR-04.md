@@ -12,7 +12,7 @@ Accepted — March 13, 2026
 ## Decision
 1. **Canonical env variables**: Adopt `NEXUS_HOME`, `NEXUS_DATA_DIR`, `NEXUS_WORKSPACE_DATA`, and `NEXUS_LOCALE` as first-class inputs, defaulting to absolute paths under `<homedir>/.nexus` and locale `en-US`. Continue validating `NEXUS_ENV`, `LOG_LEVEL`, `NEXUS_UPDATE_CHANNEL`, and `NEXUS_AUTO_UPDATE`.
 2. **Normalization & validation**: `readEnv()` now resolves relative/`~/` paths to absolutes, validates enums/locales, and exposes the resolved directory trio to every process.
-3. **Storage layout helper**: Introduce `packages/platform/storage-layout.ts` to (a) create directories, (b) migrate legacy locations using `~/.nexus-meta.json`, and (c) append JSON migration logs to `<NEXUS_HOME>/meta/storage-migrations.log`.
+3. **Storage layout helper**: Introduce `packages/platform/workspace/storage-layout.ts` to (a) create directories, (b) migrate legacy locations using `~/.nexus-meta.json`, and (c) append JSON migration logs to `<NEXUS_HOME>/meta/storage-migrations.log`.
 4. **Documentation & governance**: Document the schema in `docs/architecture/environment.md` and treat IDE-180 as a prerequisite for any epic that persists data or depends on locale bootstrapping.
 
 ## Consequences
