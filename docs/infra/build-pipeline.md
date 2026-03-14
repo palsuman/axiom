@@ -1,13 +1,14 @@
 # Build Pipeline (IDE-005)
 
 ## Overview
-Nx orchestrates builds for `apps/workbench` (Angular renderer placeholder) and `apps/desktop-shell` (Electron main placeholder). Each project uses TypeScript compilation via `tsc` with sourcemaps and inline sources enabled. The helper script `tools/scripts/run-with-env.mjs` loads `.env` before executing a command, ensuring consistent environment injection across build/watch tasks.
+Nx orchestrates builds for `apps/workbench` (workbench runtime + DOM renderer) and `apps/desktop-shell` (Electron main + preload). Each project currently uses TypeScript compilation via `tsc` with sourcemaps and inline sources enabled. The helper script `tools/scripts/run-with-env.mjs` loads `.env` before executing a command, ensuring consistent environment injection across build/watch tasks.
 
 ## Targets
 ### Workbench
 - `nx run workbench:build`
   - Executes `tsc -p apps/workbench/tsconfig.app.json`.
   - Outputs to `dist/apps/workbench` with sourcemaps.
+  - Produces the compiled DOM renderer consumed by the Electron preload at `dist/apps/workbench/apps/workbench/src/shell/workbench-dom-renderer.js`.
   - `production` configuration auto-sets `NEXUS_ENV=production`.
 - `nx run workbench:watch`
   - Uses `tsc --watch` for incremental compilation during development.
@@ -16,8 +17,13 @@ Nx orchestrates builds for `apps/workbench` (Angular renderer placeholder) and `
 - `nx run desktop-shell:build`
   - Executes `tsc -p apps/desktop-shell/tsconfig.app.json`.
   - Outputs to `dist/apps/desktop-shell` with sourcemaps.
+  - `tools/scripts/sync-desktop-shell-entry.mjs` mirrors the compiled wrapper entry to `dist/apps/desktop-shell/main.js` so IDE launch configs and Nx serve share the same startup path.
+  - Preload resolves and mounts the compiled workbench DOM renderer at runtime.
 - `nx run desktop-shell:watch`
   - Watch mode equivalent.
+- `nx run desktop-shell:serve`
+  - Builds `workbench`, runs a fresh `desktop-shell` build (`--skip-nx-cache`), then launches Electron via `dist/apps/desktop-shell/main.js`.
+  - Electron launch also runs through `tools/scripts/run-with-env.mjs` so `.env` values (`NEXUS_HOME`, `NEXUS_ENV`, etc.) apply consistently at runtime.
 
 ## Environment Management
 - `.env.example` documents default keys (`NEXUS_ENV`, `LOG_LEVEL`).
@@ -29,10 +35,11 @@ Nx orchestrates builds for `apps/workbench` (Angular renderer placeholder) and `
 ```
 yarn nx run workbench:build
 yarn nx run desktop-shell:build
+yarn nx run desktop-shell:serve
 ```
-Both commands should emit placeholder bootstrap logs referencing the active `NEXUS_ENV` and generate TypeScript outputs in `dist/`.
+The build commands should generate TypeScript outputs in `dist/`, and `desktop-shell:serve` should open an Electron window with the mounted workbench shell.
 
 ## Next Steps
-- Swap placeholder `main.ts` entries with real Angular/Electron bootstraps when frameworks are introduced.
-- Extend build targets to call Angular builder and electron-builder once available; maintain env injection via `run-with-env.mjs`.
+- Replace the current preload-mounted DOM renderer with the final browser-native Angular renderer bundle while keeping the Electron startup contract stable.
+- Extend build targets to call the Angular builder and electron-builder once available; maintain env injection via `run-with-env.mjs`.
 - Wire `tools/scripts/affected-guard.mjs` into CI once remote cache credentials are provisioned so PRs automatically fetch remote artifacts before executing affected commands.

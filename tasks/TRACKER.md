@@ -143,8 +143,8 @@ Status legend: [ ] TODO, [-] In progress, [x] Done. Update each task line as you
 
 | Status | ID | Title | Epic | Owner | Stage | Priority | Critical | Blockers | Verification | Docs/API |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [ ] | IDE-064 | Run configuration schema | Run / Debug / Test | platform | Foundation | P0 | Yes | Blocked until IDE-026 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-064 |
-| [ ] | IDE-065 | Debug adapter host | Run / Debug / Test | platform | Foundation | P0 | Yes | Blocked until IDE-064 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-065 |
+| [x] | IDE-064 | Run configuration schema | Run / Debug / Test | platform | Foundation | P0 | Yes | Blocked until IDE-026 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-064 |
+| [x] | IDE-065 | Debug adapter host | Run / Debug / Test | platform | Foundation | P0 | Yes | Blocked until IDE-064 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-065 |
 | [ ] | IDE-066 | Breakpoint + watch UI | Run / Debug / Test | platform | Foundation | P0 | Yes | Blocked until IDE-065, IDE-041 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-066 |
 | [ ] | IDE-067 | Debug console + REPL | Run / Debug / Test | platform | Foundation | P1 | No | Blocked until IDE-065 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-067 |
 | [ ] | IDE-068 | Test explorer + runner | Run / Debug / Test | platform | Expansion | P1 | No | Blocked until IDE-031, IDE-070 | Verification: Debug adapter integration + test runner E2E | Docs/API: docs/run-debug-test for IDE-068 |
@@ -221,7 +221,7 @@ Status legend: [ ] TODO, [-] In progress, [x] Done. Update each task line as you
 | Status | ID | Title | Epic | Owner | Stage | Priority | Critical | Blockers | Verification | Docs/API |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [x] | IDE-106 | Settings schema + registry | Settings / Personalization | frontend | Foundation | P0 | Yes | Blocked until IDE-017 | Verification: Settings unit tests + GUI diff | Docs/API: docs/settings for IDE-106 |
-| [ ] | IDE-107 | Settings UI (GUI + JSON) | Settings / Personalization | frontend | Foundation | P0 | Yes | Blocked until IDE-106 | Verification: Settings unit tests + GUI diff | Docs/API: docs/settings for IDE-107 |
+| [x] | IDE-107 | Settings UI (GUI + JSON) | Settings / Personalization | frontend | Foundation | P0 | Yes | Blocked until IDE-106 | Verification: Settings unit tests + GUI diff | Docs/API: docs/settings for IDE-107 |
 | [ ] | IDE-108 | Keymap editor | Settings / Personalization | frontend | Expansion | P1 | No | Blocked until IDE-012, IDE-106 | Verification: Settings unit tests + GUI diff | Docs/API: docs/settings for IDE-108 |
 | [ ] | IDE-109 | Theme/Icon pack support | Settings / Personalization | frontend | Expansion | P1 | No | Blocked until IDE-021, IDE-198, IDE-199 | Verification: Settings unit tests + GUI diff | Docs/API: docs/settings for IDE-109 |
 | [ ] | IDE-169 | Settings audit & policy hooks | Settings / Personalization | frontend | Expansion | P1 | No | Blocked until IDE-106, IDE-117 | Verification: Settings unit tests + GUI diff | Docs/API: docs/settings for IDE-169 |

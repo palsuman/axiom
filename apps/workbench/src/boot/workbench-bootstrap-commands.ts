@@ -9,6 +9,96 @@ export function registerWorkbenchCommands(context: WorkbenchBootstrapContext) {
   });
 
   context.commandRegistry.register({
+    id: 'nexus.run.focus',
+    title: 'Focus Run & Debug',
+    category: 'View',
+    handler: () => context.shell.setActiveSidebarView('view.run')
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.configurations.open',
+    title: 'Open Launch Configurations',
+    category: 'Run & Debug',
+    handler: args => {
+      const payload = (typeof args === 'object' && args ? args : {}) as {
+        mode?: 'form' | 'json';
+      };
+      return context.launchConfigurationEditorService.open({
+        mode: payload.mode ?? 'form'
+      });
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.configurations.openJson',
+    title: 'Open launch.json',
+    category: 'Run & Debug',
+    handler: () =>
+      context.launchConfigurationEditorService.open({
+        mode: 'json'
+      })
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.configurations.refresh',
+    title: 'Refresh Launch Configurations',
+    category: 'Run & Debug',
+    handler: () => context.launchConfigurationEditorService.refresh()
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.configurations.inspect',
+    title: 'Inspect Launch Configuration Snapshot',
+    category: 'Run & Debug',
+    hidden: true,
+    handler: () => context.launchConfigurationEditorService.getSnapshot()
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.debug.start',
+    title: 'Start Debug Session',
+    category: 'Run & Debug',
+    handler: args => {
+      const payload = (typeof args === 'object' && args ? args : {}) as {
+        configurationName?: string;
+        configurationIndex?: number;
+        stopOnEntry?: boolean;
+      };
+      return context.debugSessionStore.start({
+        configurationName: payload.configurationName,
+        configurationIndex: payload.configurationIndex,
+        stopOnEntry: payload.stopOnEntry
+      });
+    },
+    enabled: () => context.launchConfigurationEditorService.getSnapshot().configurations.length > 0
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.debug.stop',
+    title: 'Stop Debug Session',
+    category: 'Run & Debug',
+    handler: () => {
+      const session = context.debugSessionStore.getSnapshot().session;
+      if (!session) {
+        throw new Error('No active debug session to stop');
+      }
+      return context.debugSessionStore.stop({ sessionId: session.sessionId, terminateDebuggee: true });
+    },
+    enabled: () => {
+      const session = context.debugSessionStore.getSnapshot().session;
+      return Boolean(session && session.state !== 'terminated' && session.state !== 'failed');
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.run.debug.inspect',
+    title: 'Inspect Debug Session Snapshot',
+    category: 'Run & Debug',
+    hidden: true,
+    handler: () => context.debugSessionStore.getSnapshot()
+  });
+
+  context.commandRegistry.register({
     id: 'nexus.git.focus',
     title: 'Focus Source Control',
     category: 'View',
@@ -138,6 +228,42 @@ export function registerWorkbenchCommands(context: WorkbenchBootstrapContext) {
   });
 
   context.commandRegistry.register({
+    id: 'nexus.settings.open',
+    title: t('command.settings.open', 'Open Settings'),
+    category: 'Preferences',
+    keybinding: { mac: 'Cmd+,', win: 'Ctrl+,' },
+    handler: args => {
+      const payload = (typeof args === 'object' && args ? args : {}) as {
+        scope?: 'user' | 'workspace';
+        mode?: 'form' | 'json';
+        query?: string;
+        focusKey?: string;
+      };
+      return context.settingsEditorService.open({
+        scope: payload.scope,
+        mode: payload.mode ?? 'form',
+        query: payload.query,
+        focusKey: payload.focusKey
+      });
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.settings.openJson',
+    title: t('command.settings.openJson', 'Open Settings (JSON)'),
+    category: 'Preferences',
+    handler: args => {
+      const payload = (typeof args === 'object' && args ? args : {}) as {
+        scope?: 'user' | 'workspace';
+      };
+      return context.settingsEditorService.open({
+        scope: payload.scope,
+        mode: 'json'
+      });
+    }
+  });
+
+  context.commandRegistry.register({
     id: 'nexus.locale.cycle',
     title: t('command.locale.cycle', 'Cycle Display Language'),
     category: 'Preferences',
@@ -204,6 +330,48 @@ export function registerWorkbenchCommands(context: WorkbenchBootstrapContext) {
         );
       }
       return context.settingsService.updateUserSettings(args as Record<string, unknown>);
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.settings.editor.inspect',
+    title: 'Inspect Settings Editor Snapshot',
+    category: 'Preferences',
+    hidden: true,
+    handler: () => context.settingsEditorService.getSnapshot()
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.settings.editor.json',
+    title: 'Apply Settings JSON Draft',
+    category: 'Preferences',
+    hidden: true,
+    handler: args => {
+      if (!args || typeof args !== 'object') {
+        throw new Error('Settings JSON update requires an object payload');
+      }
+      const payload = args as { text?: string; scope?: 'user' | 'workspace' };
+      if (typeof payload.text !== 'string') {
+        throw new Error('Settings JSON update requires a string text payload');
+      }
+      return context.settingsEditorService.updateJsonText(payload.text, payload.scope ?? 'user');
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.settings.editor.update',
+    title: 'Update Scoped Setting',
+    category: 'Preferences',
+    hidden: true,
+    handler: args => {
+      if (!args || typeof args !== 'object') {
+        throw new Error('Scoped settings update requires an object payload');
+      }
+      const payload = args as { key?: string; value?: unknown; scope?: 'user' | 'workspace' };
+      if (typeof payload.key !== 'string') {
+        throw new Error('Scoped settings update requires a string key');
+      }
+      return context.settingsEditorService.updateSetting(payload.key, payload.value, payload.scope ?? 'user');
     }
   });
 

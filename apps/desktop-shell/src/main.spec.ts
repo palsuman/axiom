@@ -171,6 +171,43 @@ jest.mock('./filesystem/file-operations', () => {
   };
 });
 
+jest.mock('./run-debug/launch-configuration-service', () => {
+  const state = {
+    load: jest.fn().mockResolvedValue({
+      path: '/workspace/.nexus/launch.json',
+      exists: false,
+      text: '{\n  "version": "1.0.0",\n  "configurations": []\n}',
+      issues: []
+    }),
+    save: jest.fn().mockResolvedValue({
+      path: '/workspace/.nexus/launch.json',
+      saved: true,
+      text: '{\n  "version": "1.0.0",\n  "configurations": []\n}',
+      issues: []
+    })
+  };
+
+  return {
+    __mock: state,
+    LaunchConfigurationService: jest.fn().mockImplementation(() => state)
+  };
+});
+
+jest.mock('./run-debug/debug-adapter-host-service', () => {
+  const state = {
+    start: jest.fn(),
+    stop: jest.fn(),
+    stopSessionByWorkspaceSession: jest.fn().mockResolvedValue(undefined),
+    dispose: jest.fn(),
+    on: jest.fn()
+  };
+
+  return {
+    __mock: state,
+    DebugAdapterHostService: jest.fn().mockImplementation(() => state)
+  };
+});
+
 jest.mock('./scm/git-repository-service', () => {
   const state = {
     commit: jest.fn(),
@@ -275,6 +312,7 @@ describe('desktop shell main process', () => {
   it('registers IPC handlers on app ready', async () => {
     expect(typeof electron.getHandle('nexus:open-workspace')).toBe('function');
     expect(typeof electron.getHandle('nexus:git:stage')).toBe('function');
+    expect(typeof electron.getHandle('nexus:debug:start')).toBe('function');
     expect(typeof electron.getOn('nexus:log')).toBe('function');
   });
 
@@ -305,6 +343,19 @@ describe('desktop shell main process', () => {
       /Invalid payload for nexus:git:stage/
     );
     expect(gitRepository.__mock.stage).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid debug start payloads before creating debug sessions', async () => {
+    const debugHost = jest.requireMock('./run-debug/debug-adapter-host-service') as {
+      __mock: { start: jest.Mock };
+    };
+
+    const handler = electron.getHandle('nexus:debug:start');
+
+    expect(() => handler({ sender: { id: 9 } }, { configurationIndex: -1 })).toThrow(
+      /Invalid payload for nexus:debug:start/
+    );
+    expect(debugHost.__mock.start).not.toHaveBeenCalled();
   });
 
   it('normalizes valid renderer logs and ignores malformed payloads', async () => {

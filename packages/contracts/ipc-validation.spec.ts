@@ -79,4 +79,38 @@ describe('ipc-validation', () => {
       overwrite: true
     });
   });
+
+  it('validates debug start payloads with optional breakpoints', () => {
+    const payload = validateIpcPayload('nexus:debug:start', {
+      configurationName: 'Launch API',
+      stopOnEntry: true,
+      breakpoints: [
+        {
+          source: '/workspace/server.js',
+          lines: [12, 20]
+        }
+      ]
+    });
+
+    expect(payload).toEqual({
+      configurationName: 'Launch API',
+      configurationIndex: undefined,
+      stopOnEntry: true,
+      breakpoints: [
+        {
+          source: '/workspace/server.js',
+          lines: [12, 20]
+        }
+      ]
+    });
+  });
+
+  it('rejects malformed debug stop payloads', () => {
+    expect(() =>
+      validateIpcPayload('nexus:debug:stop', {
+        sessionId: '',
+        terminateDebuggee: 'yes'
+      })
+    ).toThrow(IpcValidationError);
+  });
 });

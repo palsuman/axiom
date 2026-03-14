@@ -2,6 +2,7 @@
 
 ## Main Process
 - Entry: `apps/desktop-shell/src/main.ts`, which delegates to `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`.
+- Startup installs runtime `@nexus/*` module alias resolution to compiled `dist/apps/desktop-shell/packages/*` outputs before loading bootstrap code, so Node can execute shared platform/contracts modules from compiled JavaScript.
 - Responsibilities: initialize Electron app, enforce single-instance lock, restore previous windows via `WindowManager`, register IPC handlers, parse CLI/open-file events into workspace launches, and manage BrowserWindow lifecycle.
 - `WindowManager` (`apps/desktop-shell/src/windowing/window-manager.ts`) wraps creation/focus logic, tracks workspace metadata, and snapshots last-focused timestamps for deterministic restore ordering.
 - Devtools open automatically when `NEXUS_ENV=development`.
@@ -19,7 +20,11 @@
 ## IPC & Preload
 - Contracts defined in `packages/contracts/ipc.ts` (`nexus:get-env`, `nexus:log`, `nexus:new-window`, `nexus:get-window-session`, `nexus:open-workspace`).
 - Preload exposes the safe API via `window.nexus.getEnv/log/openNewWindow/getWindowSession/openWorkspace` under `contextIsolation` with `nodeIntegration` disabled.
-- Renderer can request a new empty window or instruct the shell to launch a workspace in a new/reused window; it can also query the current window's session metadata to bootstrap the Angular workspace service.
+- The current preload remains non-sandboxed at the Electron window level (`sandbox: false`) because the shell loads modular compiled preload files instead of a single bundle; renderer code still runs without Node globals.
+- Runtime `@nexus/*` alias resolution searches both compiled package roots (`dist/apps/desktop-shell/packages` and `dist/apps/workbench/packages`) so preload-loaded workbench modules can resolve shared platform/contracts code correctly.
+- `WindowManager` resolves the preload entry from the compiled `windowing/` output to `../preload.js` (with a same-directory fallback), keeping BrowserWindow startup aligned with the TypeScript build layout in `dist/apps/desktop-shell/apps/desktop-shell/src/`.
+- The preload layer now also mounts the compiled workbench DOM renderer after `DOMContentLoaded`, so Electron windows show the real workbench shell instead of a placeholder HTML card.
+- Renderer can request a new empty window or instruct the shell to launch a workspace in a new/reused window; it can also query the current window's session metadata to bootstrap the workbench services.
 
 ## Native Menus & Keymaps (IDE-012)
 - `KeymapService` (`apps/desktop-shell/src/windowing/keymap-service.ts`) resolves `NEXUS_HOME` (default `.nexus`) and stores user overrides in `<NEXUS_HOME>/keymaps.json`. The service seeds defaults for cross-platform accelerators, watches the JSON file, and emits `changed` events whenever bindings change.
@@ -44,7 +49,7 @@
 
 ## Commands
 - `yarn nx run desktop-shell:build` – compiles TypeScript entrypoints.
-- `yarn nx run desktop-shell:serve` – build + launch Electron (manual run locally; add xvfb before CI automation).
+- `yarn nx run desktop-shell:serve` – builds the workbench renderer, builds the desktop shell, then launches Electron.
 
 ## Next Steps
 - Wire workspace selection UI (IDE-026) to `window.nexus.openWorkspace`, add crash reporting (IDE-015), and expand IPC contracts for explorer/editor features.

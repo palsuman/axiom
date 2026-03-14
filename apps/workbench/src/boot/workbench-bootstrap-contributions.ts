@@ -4,6 +4,8 @@ import type { GitStatusSnapshot } from '../scm/git-status-store';
 import { createNotificationStatusItem } from '../shell/workbench-shell-status';
 import { DEFAULT_ACTIVITY_ITEMS, type WorkbenchShell } from '../shell/workbench-shell';
 import type { CommandPaletteService } from '../commands/command-palette';
+import type { SettingsEditorService } from '../settings/settings-editor-service';
+import type { LaunchConfigurationEditorService } from '../run-debug/launch-configuration-editor-service';
 import type { WorkspaceService } from '../workspace/workspace-service';
 import type { GitStatusStore } from '../scm/git-status-store';
 
@@ -18,9 +20,17 @@ export function registerWorkbenchContributions(options: {
   workspaceService: WorkspaceService;
   gitStatusStore: GitStatusStore;
   i18nService: I18nService;
+  settingsEditorService: SettingsEditorService;
+  launchConfigurationEditorService: LaunchConfigurationEditorService;
 }): WorkbenchContributionBindings {
   registerWorkbenchStructure(options.shell);
-  registerQuickOpenProviders(options.commandPalette, options.workspaceService, options.i18nService);
+  registerQuickOpenProviders(
+    options.commandPalette,
+    options.workspaceService,
+    options.i18nService,
+    options.settingsEditorService,
+    options.launchConfigurationEditorService
+  );
   options.shell.registerStatusItem({ id: 'status.encoding', alignment: 'right', text: 'UTF-8', priority: 5 });
 
   const updateLocaleStatusItem = () => {
@@ -95,6 +105,7 @@ function registerWorkbenchStructure(shell: WorkbenchShell) {
   shell.registerSidebarView({ id: 'view.explorer', title: 'Explorer', order: 1, containerId: 'activity.explorer' });
   shell.registerSidebarView({ id: 'view.search', title: 'Search', order: 2, containerId: 'activity.search' });
   shell.registerSidebarView({ id: 'view.git', title: 'Source Control', order: 3, containerId: 'activity.git' });
+  shell.registerSidebarView({ id: 'view.run', title: 'Run & Debug', order: 4, containerId: 'activity.run' });
   shell.registerPanelView({ id: 'panel.terminal', title: 'Terminal', order: 1 });
   shell.registerPanelView({ id: 'panel.output', title: 'Output', order: 2 });
 }
@@ -102,7 +113,9 @@ function registerWorkbenchStructure(shell: WorkbenchShell) {
 function registerQuickOpenProviders(
   commandPalette: CommandPaletteService,
   workspaceService: WorkspaceService,
-  i18nService: I18nService
+  i18nService: I18nService,
+  settingsEditorService: SettingsEditorService,
+  launchConfigurationEditorService: LaunchConfigurationEditorService
 ) {
   commandPalette.registerProvider({
     id: 'recent-workspaces',
@@ -174,6 +187,154 @@ function registerQuickOpenProviders(
           metadata: { locale }
         };
       }).filter(item => (isLocaleSearch ? item.score >= 0.05 : item.score > 0));
+    }
+  });
+
+  commandPalette.registerProvider({
+    id: 'run-configurations',
+    getItems: query => {
+      const snapshot = launchConfigurationEditorService.getSnapshot();
+      const normalizedQuery = query.trim().toLowerCase();
+      const actionItems: Array<{
+        id: string;
+        type: 'custom';
+        label: string;
+        detail: string;
+        score: number;
+        source: string;
+        commandId: string;
+        metadata: Record<string, unknown>;
+      }> = [
+        {
+          id: 'run-config:open',
+          type: 'custom',
+          label: 'Open Launch Configurations',
+          detail: 'Run & Debug',
+          score: normalizedQuery ? fuzzyScore(normalizedQuery, 'open launch configurations run debug') : 0.16,
+          source: 'run-config-action',
+          commandId: 'nexus.run.configurations.open',
+          metadata: { mode: 'form' }
+        },
+        {
+          id: 'run-config:json',
+          type: 'custom',
+          label: 'Open launch.json',
+          detail: 'Run & Debug',
+          score: normalizedQuery ? fuzzyScore(normalizedQuery, 'open launch json run debug') : 0.15,
+          source: 'run-config-action',
+          commandId: 'nexus.run.configurations.openJson',
+          metadata: {}
+        }
+      ];
+      const primaryConfiguration = snapshot.configurations[0];
+      if (primaryConfiguration) {
+        actionItems.push({
+          id: 'run-config:start',
+          type: 'custom' as const,
+          label: `Start ${primaryConfiguration.name}`,
+          detail: 'Run & Debug',
+          score: normalizedQuery ? fuzzyScore(normalizedQuery, `start debug ${primaryConfiguration.name}`) : 0.14,
+          source: 'run-config-action',
+          commandId: 'nexus.run.debug.start',
+          metadata: {
+            configurationName: primaryConfiguration.name
+          }
+        });
+      }
+
+      const configurationItems = snapshot.configurations
+        .map(configuration => ({
+          id: `run-config:${configuration.name}`,
+          type: 'custom' as const,
+          label: configuration.name,
+          detail: `${configuration.type} • ${configuration.request}`,
+          score: normalizedQuery
+            ? Math.max(fuzzyScore(normalizedQuery, configuration.name), fuzzyScore(normalizedQuery, configuration.type))
+            : 0.07,
+          source: 'run-config-entry',
+          commandId: 'nexus.run.configurations.open',
+          metadata: { mode: 'form' }
+        }))
+        .filter(item => item.score > 0 || !normalizedQuery);
+
+      return [...actionItems.filter(item => item.score > 0 || !normalizedQuery), ...configurationItems];
+    }
+  });
+
+  commandPalette.registerProvider({
+    id: 'settings-search',
+    getItems: query => {
+      const snapshot = settingsEditorService.getSnapshot();
+      const normalizedQuery = query.trim().toLowerCase();
+      const keywordScore = normalizedQuery ? fuzzyScore(normalizedQuery, 'settings preferences') : 0.05;
+      const actionItems = [
+        {
+          id: 'settings:user:form',
+          type: 'custom' as const,
+          label: 'Open User Settings',
+          detail: 'Preferences',
+          score: normalizedQuery ? Math.max(keywordScore, fuzzyScore(normalizedQuery, 'user settings')) : 0.2,
+          source: 'settings-action',
+          commandId: 'nexus.settings.open',
+          metadata: { scope: 'user', mode: 'form' }
+        },
+        {
+          id: 'settings:user:json',
+          type: 'custom' as const,
+          label: 'Open User Settings (JSON)',
+          detail: 'Preferences',
+          score: normalizedQuery ? Math.max(keywordScore, fuzzyScore(normalizedQuery, 'user settings json')) : 0.19,
+          source: 'settings-action',
+          commandId: 'nexus.settings.openJson',
+          metadata: { scope: 'user' }
+        }
+      ];
+
+      if (snapshot.availableScopes.includes('workspace')) {
+        actionItems.push({
+          id: 'settings:workspace:form',
+          type: 'custom' as const,
+          label: 'Open Workspace Settings',
+          detail: 'Preferences',
+          score: normalizedQuery ? Math.max(keywordScore, fuzzyScore(normalizedQuery, 'workspace settings')) : 0.18,
+          source: 'settings-action',
+          commandId: 'nexus.settings.open',
+          metadata: { scope: 'workspace', mode: 'form' }
+        });
+        actionItems.push({
+          id: 'settings:workspace:json',
+          type: 'custom' as const,
+          label: 'Open Workspace Settings (JSON)',
+          detail: 'Preferences',
+          score: normalizedQuery
+            ? Math.max(keywordScore, fuzzyScore(normalizedQuery, 'workspace settings json'))
+            : 0.17,
+          source: 'settings-action',
+          commandId: 'nexus.settings.openJson',
+          metadata: { scope: 'workspace' }
+        });
+      }
+
+      const settingItems = settingsEditorService
+        .querySections(snapshot.activeScope, query)
+        .flatMap(section =>
+          section.entries.map(entry => ({
+            id: `setting:${entry.key}`,
+            type: 'custom' as const,
+            label: entry.title,
+            detail: `${section.title} • ${entry.key}`,
+            description: entry.description,
+            score: normalizedQuery
+              ? Math.max(fuzzyScore(normalizedQuery, entry.title), fuzzyScore(normalizedQuery, entry.key))
+              : 0.08,
+            source: 'settings-entry',
+            commandId: 'nexus.settings.open',
+            metadata: { scope: snapshot.activeScope, mode: 'form', focusKey: entry.key }
+          }))
+        )
+        .filter(item => item.score > 0 || !normalizedQuery);
+
+      return [...actionItems.filter(item => item.score > 0 || !normalizedQuery), ...settingItems];
     }
   });
 }

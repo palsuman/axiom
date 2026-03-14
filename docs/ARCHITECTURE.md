@@ -9,7 +9,7 @@
    - Command registry + palette service supply fuzzy-searched quick open across commands/recent files, honoring keybindings + locale metadata and driving the renderer command palette UI.
 3. **Shared Packages**
    - `packages/contracts`: TypeScript interfaces for IPC, extension APIs, prompt schemas.
-  - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `workspace`, `settings`, `theming`, `windowing`, `scm`).
+  - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `workspace`, `settings`, `theming`, `windowing`, `scm`, `run-debug`).
    - `packages/ui-kit`: reusable Angular components + theme tokens.
    - `packages/editor-adapter`: Monaco configuration, model lifecycle helpers.
    - `packages/ai-core`: llama.cpp orchestration SDK, prompt DSL, telemetry hooks.
@@ -28,7 +28,7 @@
 
 ## IPC & Contracts
 - Typed channels defined in `packages/contracts` with validation enforced both in preload and renderer.
-- IPC categories: `workspace`, `fs`, `telemetry`, `ai`, `extension-host`, `terminal`, `debug`, `search`.
+- IPC categories: `workspace`, `fs`, `telemetry`, `ai`, `extension-host`, `terminal`, `debug`, `run-config`, `search`.
 - Feature flags + permissions gate API access; untrusted workspaces restrict commands until trust granted.
 
 ## Extension Surface
@@ -79,6 +79,7 @@
   - `config`
   - `explorer`
   - `filesystem`
+  - `run-debug`
   - `scm/git`
   - `settings`
   - `theming`
@@ -97,6 +98,7 @@
   - `bootstrap`
   - `filesystem`
   - `preload`
+  - `run-debug`
   - `scm`
   - `system`
   - `terminal`
@@ -108,6 +110,7 @@
   - `editor`
   - `explorer`
   - `i18n`
+  - `run-debug`
   - `scm`
   - `settings`
   - `shell`
@@ -120,6 +123,12 @@
   - `boot/workbench-bootstrap-contributions.ts` for shell/view/status providers
   - `boot/workbench-bootstrap-commands.ts` for command registration
   - `boot/workbench-bootstrap-runtime.ts` for terminal mount, workspace restore, and SCM startup
+  - `run-debug/launch-configuration-editor-service.ts` for schema-backed launch configuration editing and renderer-side persistence flow
+  - `run-debug/debug-session-store.ts` for debug session lifecycle snapshots, output buffering, and stack-frame updates
+  - `settings/settings-service.ts` for persisted/resolved settings and theme runtime ownership
+  - `settings/settings-editor-service.ts` for searchable form/JSON settings editor state and scope-aware workbench commands
   - `shell/workbench-shell.ts` as a facade over shell state, layout, and notification helpers
+  - `shell/workbench-dom-renderer.ts` for DOM mounting of the current workbench shell inside Electron
   - `shell/workbench-shell-contract.ts`, `shell/workbench-shell-state.ts`, and `shell/workbench-shell-layout.ts` for focused shell internals
 - App roots should not become feature buckets. If a subsystem grows beyond a single file, create a domain folder before the layout drifts.
+- Run / Debug / Test documentation lives in `docs/run-debug-test/README.md`, which is the authoritative contract for `launch.json`, debug-session IPC/event channels, and verification commands.

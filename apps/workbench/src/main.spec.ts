@@ -33,6 +33,18 @@ function createNexusBridge() {
     fsCopyEntries: jest.fn().mockResolvedValue({ paths: [] }),
     fsDeleteEntries: jest.fn().mockResolvedValue({ paths: [] }),
     fsUndo: jest.fn().mockResolvedValue(true),
+    runConfigLoad: jest.fn().mockResolvedValue({
+      path: '/tmp/workspace/.nexus/launch.json',
+      exists: false,
+      text: '{\n  "version": "1.0.0",\n  "configurations": []\n}',
+      issues: []
+    }),
+    runConfigSave: jest.fn().mockResolvedValue({
+      path: '/tmp/workspace/.nexus/launch.json',
+      saved: true,
+      text: '{\n  "version": "1.0.0",\n  "configurations": []\n}',
+      issues: []
+    }),
     gitListRepositories: jest.fn().mockResolvedValue([]),
     gitGetStatus: jest.fn().mockResolvedValue({
       repositoryId: 'repo-1',
@@ -163,5 +175,24 @@ describe('workbench shell bootstrap', () => {
     expect(module.i18nService.getLocale()).toBe('fr-FR');
     const translatedPalette = await module.commandPalette.search('palette');
     expect(translatedPalette.items.some((item: { label: string }) => item.label.includes('Afficher'))).toBe(true);
+    const settingsSnapshot = await module.commandRegistry.executeCommand('nexus.settings.open', {
+      scope: 'user',
+      mode: 'form'
+    });
+    expect((settingsSnapshot as { editorResource: string }).editorResource).toBe('settings://user/form');
+    const jsonSnapshot = await module.commandRegistry.executeCommand('nexus.settings.editor.json', {
+      scope: 'user',
+      text: JSON.stringify({ 'editor.tabSize': 6 }, null, 2)
+    });
+    expect((jsonSnapshot as { jsonText: string }).jsonText).toContain('"editor.tabSize": 6');
+    expect(module.settingsEditorService.getSnapshot().jsonText).toContain('"editor.tabSize": 6');
+    const settingsItems = await module.commandPalette.search('settings');
+    expect(settingsItems.items.some((item: { id: string }) => item.id.startsWith('settings:'))).toBe(true);
+    const runSnapshot = await module.commandRegistry.executeCommand('nexus.run.configurations.open', {
+      mode: 'form'
+    });
+    expect((runSnapshot as { editorResource: string }).editorResource).toBe('run-config://form');
+    const runItems = await module.commandPalette.search('launch');
+    expect(runItems.items.some((item: { id: string }) => item.id.startsWith('run-config:'))).toBe(true);
   });
 });

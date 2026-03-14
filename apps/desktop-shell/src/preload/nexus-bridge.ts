@@ -1,7 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { mountWorkbenchRenderer } from './workbench-renderer-loader';
 import type {
   CopyEntriesPayload,
   CreateEntryPayload,
+  DebugSessionEvent,
+  DebugSessionSnapshot,
+  DebugSessionStartPayload,
+  DebugSessionStopPayload,
+  DebugSessionStopResponse,
   DeleteEntriesPayload,
   FsOperationResponse,
   GetEnvResponse,
@@ -21,6 +27,8 @@ import type {
   PickWorkspaceResponse,
   RecentWorkspaceEntry,
   RenameEntryPayload,
+  RunConfigurationLoadResponse,
+  RunConfigurationSaveResponse,
   TerminalCreatePayload,
   TerminalDataEvent,
   TerminalDescriptor,
@@ -36,6 +44,7 @@ import type {
 
 const terminalDataListeners = new Set<(event: TerminalDataEvent) => void>();
 const terminalExitListeners = new Set<(event: TerminalExitEvent) => void>();
+const debugEventListeners = new Set<(event: DebugSessionEvent) => void>();
 
 ipcRenderer.on('nexus:terminal:data', (_event, payload: TerminalDataEvent) => {
   terminalDataListeners.forEach(listener => listener(payload));
@@ -43,6 +52,10 @@ ipcRenderer.on('nexus:terminal:data', (_event, payload: TerminalDataEvent) => {
 
 ipcRenderer.on('nexus:terminal:exit', (_event, payload: TerminalExitEvent) => {
   terminalExitListeners.forEach(listener => listener(payload));
+});
+
+ipcRenderer.on('nexus:debug:event', (_event, payload: DebugSessionEvent) => {
+  debugEventListeners.forEach(listener => listener(payload));
 });
 
 const api = {
@@ -84,6 +97,18 @@ const api = {
   },
   async fsUndo(payload: UndoPayload): Promise<boolean> {
     return ipcRenderer.invoke('nexus:fs:undo', payload);
+  },
+  async runConfigLoad(): Promise<RunConfigurationLoadResponse> {
+    return ipcRenderer.invoke('nexus:run-config:load');
+  },
+  async runConfigSave(text: string): Promise<RunConfigurationSaveResponse> {
+    return ipcRenderer.invoke('nexus:run-config:save', { text });
+  },
+  async debugStart(payload: DebugSessionStartPayload = {}): Promise<DebugSessionSnapshot> {
+    return ipcRenderer.invoke('nexus:debug:start', payload);
+  },
+  async debugStop(payload: DebugSessionStopPayload = {}): Promise<DebugSessionStopResponse> {
+    return ipcRenderer.invoke('nexus:debug:stop', payload);
   },
   async gitListRepositories(): Promise<GitRepositoryInfo[]> {
     return ipcRenderer.invoke('nexus:git:list-repositories');
@@ -134,10 +159,15 @@ const api = {
   onTerminalExit(listener: (event: TerminalExitEvent) => void) {
     terminalExitListeners.add(listener);
     return () => terminalExitListeners.delete(listener);
+  },
+  onDebugEvent(listener: (event: DebugSessionEvent) => void) {
+    debugEventListeners.add(listener);
+    return () => debugEventListeners.delete(listener);
   }
 };
 
 contextBridge.exposeInMainWorld('nexus', api);
+mountWorkbenchRenderer();
 
 declare global {
   interface Window {

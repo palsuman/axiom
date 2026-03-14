@@ -6,6 +6,6 @@
     "inlineSources": true,
     "types": ["node", "electron"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "main.ts"],
   "exclude": ["**/*.spec.ts", "src/test-utils/**/*"]
 }

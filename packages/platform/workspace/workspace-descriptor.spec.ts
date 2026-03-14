@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadWorkspaceDescriptor, isWorkspaceDescriptorFile } from './workspace-descriptor';
+import { loadWorkspaceDescriptor, isWorkspaceDescriptorFile, saveWorkspaceDescriptorSettings } from './workspace-descriptor';
 
 describe('workspace descriptor', () => {
   let tempDir: string;
@@ -69,14 +69,15 @@ describe('workspace descriptor', () => {
       descriptorPath,
       JSON.stringify({
         name: 'legacy',
-        folders: [{ path: '.' }]
+        folders: [{ path: '.' }],
+        settings: { 'editor.tabSize': 4 }
       }),
       'utf8'
     );
     const descriptor = loadWorkspaceDescriptor(descriptorPath);
     expect(descriptor.label).toBe('legacy');
     expect(descriptor.folders).toHaveLength(1);
-    expect(descriptor.settings).toBeUndefined();
+    expect(descriptor.settings).toEqual({ 'editor.tabSize': 4 });
     expect(descriptor.tasks).toBeUndefined();
   });
 
@@ -84,5 +85,43 @@ describe('workspace descriptor', () => {
     const descriptorPath = path.join(tempDir, 'broken.nexus-workspace.json');
     fs.writeFileSync(descriptorPath, JSON.stringify({ folders: [] }), 'utf8');
     expect(() => loadWorkspaceDescriptor(descriptorPath)).toThrow(/must declare at least one folder/);
+  });
+
+  it('persists settings into an existing workspace descriptor file', () => {
+    const descriptorPath = path.join(tempDir, 'sample.nexus-workspace.json');
+    fs.writeFileSync(
+      descriptorPath,
+      JSON.stringify({
+        name: 'sample',
+        folders: [{ path: '.' }],
+        tasks: [{ id: 'build', command: 'yarn build' }]
+      }),
+      'utf8'
+    );
+
+    const persistedPath = saveWorkspaceDescriptorSettings(descriptorPath, {
+      'files.autoSave': 'afterDelay'
+    });
+
+    expect(persistedPath).toBe(descriptorPath);
+    const descriptor = loadWorkspaceDescriptor(descriptorPath);
+    expect(descriptor.settings).toEqual({ 'files.autoSave': 'afterDelay' });
+    expect(descriptor.tasks).toEqual([
+      { id: 'build', command: 'yarn build', type: 'shell', label: undefined, options: undefined }
+    ]);
+  });
+
+  it('creates a nexus workspace descriptor when saving settings for a folder workspace', () => {
+    const workspaceDir = path.join(tempDir, 'workspace-folder');
+    fs.mkdirSync(workspaceDir, { recursive: true });
+
+    const persistedPath = saveWorkspaceDescriptorSettings(workspaceDir, {
+      'editor.wordWrap': 'on'
+    });
+
+    expect(persistedPath).toBe(path.join(workspaceDir, '.nexus-workspace.json'));
+    const descriptor = loadWorkspaceDescriptor(persistedPath);
+    expect(descriptor.primary).toBe(workspaceDir);
+    expect(descriptor.settings).toEqual({ 'editor.wordWrap': 'on' });
   });
 });

@@ -16,6 +16,8 @@
   - `window.nexus.log({ level, message })` → sends structured logs.
 - Main-process validation and IPC registration live in `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`, keeping the bridge implementation separate from native privilege decisions.
 - `contextIsolation: true` and `nodeIntegration: false` guarantee renderer cannot access Node APIs directly.
+- `BrowserWindow` currently sets `sandbox: false` for the preload context because the desktop shell ships the preload as modular TypeScript output (`preload.js` + sibling modules) rather than a single bundled script. This preserves the secure renderer boundary while keeping local preload module loading functional.
+- Preload-time `@nexus/*` module resolution searches both compiled app package trees so workbench renderer modules can resolve shared runtime dependencies from `dist/apps/workbench/packages` while the desktop shell keeps using `dist/apps/desktop-shell/packages`.
 - Declare `Window.nexus` typings so TypeScript-aware renderers use the safe surface.
 
 ## Usage Example
@@ -25,5 +27,5 @@ window.nexus.log({ level: 'info', message: `Renderer boot in ${env.nexusEnv}` })
 ```
 
 ## Next Steps
-- Tighten renderer sandboxing and CSP enforcement on top of the validated IPC surface.
+- Bundle the preload into a single file, then re-enable Electron preload sandboxing on top of the validated IPC surface and CSP enforcement.
 - Extend contracts for AI/chat communications after IDE-076.

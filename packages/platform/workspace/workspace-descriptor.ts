@@ -30,6 +30,7 @@ export type WorkspaceDescriptor = {
 type VsCodeDescriptor = {
   folders?: Array<{ path: string; name?: string }>;
   name?: string;
+  settings?: Record<string, unknown>;
 };
 
 type NexusWorkspaceFile = {
@@ -98,6 +99,22 @@ export function loadWorkspaceDescriptor(targetPath: string): WorkspaceDescriptor
   };
 }
 
+export function saveWorkspaceDescriptorSettings(targetPath: string, settings: Record<string, unknown>) {
+  const resolved = path.resolve(targetPath);
+  const descriptorPath = resolveDescriptorPathForSettings(resolved);
+  const descriptorDocument = readOrCreateDescriptorDocument(resolved, descriptorPath);
+
+  if (Object.keys(settings).length > 0) {
+    descriptorDocument.settings = settings;
+  } else {
+    delete descriptorDocument.settings;
+  }
+
+  fs.mkdirSync(path.dirname(descriptorPath), { recursive: true });
+  fs.writeFileSync(descriptorPath, `${JSON.stringify(descriptorDocument, null, 2)}\n`, 'utf8');
+  return descriptorPath;
+}
+
 function parseDescriptor(raw: string, filePath: string): {
   name?: string;
   folders?: Array<{ path: string; name?: string }>;
@@ -114,6 +131,7 @@ function parseDescriptor(raw: string, filePath: string): {
 function parseVsCodeWorkspace(raw: string, filePath: string): {
   name?: string;
   folders?: Array<{ path: string; name?: string }>;
+  settings?: Record<string, unknown>;
 } {
   try {
     const parsed = JSON.parse(raw);
@@ -123,7 +141,8 @@ function parseVsCodeWorkspace(raw: string, filePath: string): {
     const vscode = parsed as VsCodeDescriptor;
     return {
       name: vscode.name,
-      folders: vscode.folders
+      folders: vscode.folders,
+      settings: vscode.settings
     };
   } catch (error) {
     throw new Error(`Failed to parse workspace descriptor ${filePath}: ${(error as Error).message}`);
@@ -196,7 +215,7 @@ function buildFolderEntries(folders: Array<{ path: string; name?: string }>, des
 
 function normalizeFolderPath(folderPath: string | undefined, baseDir: string) {
   if (!folderPath || typeof folderPath !== 'string') return undefined;
-  const expanded = folderPath.replace(/^\~/, () => path.join(process.env.HOME || '', ''));
+  const expanded = folderPath.replace(/^~/, () => path.join(process.env.HOME || '', ''));
   if (path.isAbsolute(expanded)) {
     return path.normalize(expanded);
   }
@@ -215,4 +234,63 @@ function buildFolderEntry(pathValue: string, name: string, originalPath?: string
     name,
     originalPath
   };
+}
+
+function resolveDescriptorPathForSettings(resolvedPath: string) {
+  if (fs.existsSync(resolvedPath)) {
+    const stats = fs.statSync(resolvedPath);
+    if (stats.isFile() && isWorkspaceDescriptorFile(resolvedPath)) {
+      return resolvedPath;
+    }
+    if (stats.isDirectory()) {
+      return path.join(resolvedPath, '.nexus-workspace.json');
+    }
+    if (stats.isFile()) {
+      return path.join(path.dirname(resolvedPath), '.nexus-workspace.json');
+    }
+  }
+
+  if (isWorkspaceDescriptorFile(resolvedPath)) {
+    return resolvedPath;
+  }
+
+  return path.join(path.dirname(resolvedPath), '.nexus-workspace.json');
+}
+
+function readOrCreateDescriptorDocument(sourcePath: string, descriptorPath: string) {
+  if (fs.existsSync(descriptorPath)) {
+    const raw = fs.readFileSync(descriptorPath, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`Workspace descriptor ${descriptorPath} must contain a JSON object`);
+    }
+    return parsed as Record<string, unknown>;
+  }
+
+  const workspaceRoot = inferWorkspaceRoot(sourcePath, descriptorPath);
+  return {
+    version: 1,
+    name: path.basename(workspaceRoot) || workspaceRoot,
+    folders: [
+      {
+        path: '.'
+      }
+    ]
+  } as Record<string, unknown>;
+}
+
+function inferWorkspaceRoot(sourcePath: string, descriptorPath: string) {
+  if (fs.existsSync(sourcePath)) {
+    const stats = fs.statSync(sourcePath);
+    if (stats.isDirectory()) {
+      return sourcePath;
+    }
+    if (stats.isFile() && isWorkspaceDescriptorFile(sourcePath)) {
+      return path.dirname(sourcePath);
+    }
+    if (stats.isFile()) {
+      return path.dirname(sourcePath);
+    }
+  }
+  return path.dirname(descriptorPath);
 }

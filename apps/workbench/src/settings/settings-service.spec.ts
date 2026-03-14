@@ -309,4 +309,63 @@ describe('SettingsService', () => {
     expect(snapshot.colors['statusBar.background']).toBe('#ffff00');
     expect(snapshot.layout['statusBar.height']).toBe('26px');
   });
+
+  it('persists workspace-scoped updates back to an existing descriptor file', () => {
+    const userSettingsPath = path.join(tempDir, 'settings', 'user.json');
+    const workspacePath = path.join(tempDir, 'sample.nexus-workspace.json');
+    fs.writeFileSync(
+      workspacePath,
+      JSON.stringify(
+        {
+          name: 'sample',
+          folders: [{ path: '.' }],
+          settings: {
+            'editor.tabSize': 2
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const service = new SettingsService({
+      shell,
+      env: { nexusHome: tempDir, defaultLocale: 'en-US' },
+      userSettingsPath,
+      workspacePath,
+      i18n,
+      logger: message => messages.push(message)
+    });
+
+    service.initialize();
+    service.updateSetting('workspace', 'editor.tabSize', 6);
+
+    const persisted = JSON.parse(fs.readFileSync(workspacePath, 'utf8'));
+    expect(persisted.settings).toEqual({ 'editor.tabSize': 6 });
+    expect(service.get('editor.tabSize')).toBe(6);
+  });
+
+  it('creates a workspace descriptor when saving workspace settings for a folder workspace', () => {
+    const userSettingsPath = path.join(tempDir, 'settings', 'user.json');
+    const workspaceDir = path.join(tempDir, 'folder-workspace');
+    fs.mkdirSync(workspaceDir, { recursive: true });
+
+    const service = new SettingsService({
+      shell,
+      env: { nexusHome: tempDir, defaultLocale: 'en-US' },
+      userSettingsPath,
+      workspacePath: workspaceDir,
+      i18n,
+      logger: message => messages.push(message)
+    });
+
+    service.initialize();
+    service.updateSetting('workspace', 'editor.wordWrap', 'on');
+
+    const descriptorPath = path.join(workspaceDir, '.nexus-workspace.json');
+    const persisted = JSON.parse(fs.readFileSync(descriptorPath, 'utf8'));
+    expect(persisted.settings).toEqual({ 'editor.wordWrap': 'on' });
+    expect(service.getScopeFilePath('workspace')).toBe(descriptorPath);
+  });
 });

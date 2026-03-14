@@ -12,6 +12,8 @@ import { ensureStorageLayout } from '@nexus/platform/workspace/storage-layout';
 import { loadWorkspaceDescriptor } from '@nexus/platform/workspace/workspace-descriptor';
 import { WorkspaceBackupManager } from '@nexus/platform/workspace/workspace-backup';
 import { FileOperationsService } from '../filesystem/file-operations';
+import { DebugAdapterHostService } from '../run-debug/debug-adapter-host-service';
+import { LaunchConfigurationService } from '../run-debug/launch-configuration-service';
 import { GitRepositoryService } from '../scm/git-repository-service';
 import { AssociationService } from '../system/association-service';
 import { CrashService } from '../system/crash-service';
@@ -49,6 +51,8 @@ const fileOperations = new FileOperationsService(env, windowManager);
 const gitRepositoryService = new GitRepositoryService();
 const terminalService = new TerminalService();
 const workspaceBackupManager = new WorkspaceBackupManager({ dataRoot: env.workspaceDataDir });
+const launchConfigurationService = new LaunchConfigurationService(windowManager);
+const debugAdapterHostService = new DebugAdapterHostService(windowManager, launchConfigurationService);
 
 enqueueWorkspaceRequests(parseWorkspaceArgs(process.argv, process.cwd()));
 crashService.initialize();
@@ -64,6 +68,7 @@ windowManager.onWindowReady(id => {
 windowManager.onSessionRemoved(id => {
   gitRepositoryService.detachSession(id);
   terminalService.disposeBySession(id);
+  void debugAdapterHostService.stopSessionByWorkspaceSession(id);
 });
 
 terminalService.on('data', payload => {
@@ -74,6 +79,11 @@ terminalService.on('data', payload => {
 terminalService.on('exit', payload => {
   const target = webContents.fromId(payload.ownerId);
   target?.send('nexus:terminal:exit', { terminalId: payload.terminalId, code: payload.code, signal: payload.signal });
+});
+
+debugAdapterHostService.on('event', payload => {
+  const target = webContents.fromId(payload.ownerId);
+  target?.send('nexus:debug:event', payload.event);
 });
 
 function registerIpcHandlers() {
@@ -172,6 +182,17 @@ function registerIpcHandlers() {
   ipcMain.handle('nexus:fs:copy', (event, payload) => fileOperations.copy(event.sender, requireValidPayload('nexus:fs:copy', payload)));
   ipcMain.handle('nexus:fs:delete', (event, payload) => fileOperations.delete(event.sender, requireValidPayload('nexus:fs:delete', payload)));
   ipcMain.handle('nexus:fs:undo', (event, payload) => fileOperations.undo(event.sender, requireValidPayload('nexus:fs:undo', payload)));
+
+  ipcMain.handle('nexus:run-config:load', event => launchConfigurationService.load(event.sender));
+  ipcMain.handle('nexus:run-config:save', (event, payload) =>
+    launchConfigurationService.save(event.sender, requireValidPayload('nexus:run-config:save', payload))
+  );
+  ipcMain.handle('nexus:debug:start', (event, payload) =>
+    debugAdapterHostService.start(event.sender, requireValidPayload('nexus:debug:start', payload))
+  );
+  ipcMain.handle('nexus:debug:stop', (event, payload) =>
+    debugAdapterHostService.stop(event.sender, requireValidPayload('nexus:debug:stop', payload))
+  );
 
   ipcMain.handle('nexus:workspace-backup:save', (_event, payload) => {
     const payloadValue = requireValidPayload('nexus:workspace-backup:save', payload);
@@ -276,6 +297,7 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   menuService.dispose();
+  debugAdapterHostService.dispose();
   gitRepositoryService.dispose();
   keymapService.dispose();
   log('Application exiting');

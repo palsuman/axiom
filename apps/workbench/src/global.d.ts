@@ -1,6 +1,11 @@
 import type {
   CopyEntriesPayload,
   CreateEntryPayload,
+  DebugSessionEvent,
+  DebugSessionSnapshot,
+  DebugSessionStartPayload,
+  DebugSessionStopPayload,
+  DebugSessionStopResponse,
   DeleteEntriesPayload,
   FsOperationResponse,
   GitCommitPayload,
@@ -18,6 +23,8 @@ import type {
   PickWorkspaceResponse,
   RecentWorkspaceEntry,
   RenameEntryPayload,
+  RunConfigurationLoadResponse,
+  RunConfigurationSaveResponse,
   TerminalCreatePayload,
   TerminalDataEvent,
   TerminalDescriptor,
@@ -38,6 +45,11 @@ type NexusBridge = {
   fsCopyEntries(payload: CopyEntriesPayload): Promise<FsOperationResponse>;
   fsDeleteEntries(payload: DeleteEntriesPayload): Promise<FsOperationResponse>;
   fsUndo(payload: UndoPayload): Promise<boolean>;
+  runConfigLoad(): Promise<RunConfigurationLoadResponse>;
+  runConfigSave(text: string): Promise<RunConfigurationSaveResponse>;
+  debugStart(payload?: DebugSessionStartPayload): Promise<DebugSessionSnapshot>;
+  debugStop(payload?: DebugSessionStopPayload): Promise<DebugSessionStopResponse>;
+  onDebugEvent(listener: (event: DebugSessionEvent) => void): () => void;
   gitListRepositories(): Promise<GitRepositoryInfo[]>;
   gitGetStatus(payload: GitStatusRequest): Promise<GitStatusSummary>;
   gitStage(payload: GitStagePayload): Promise<GitStatusSummary>;

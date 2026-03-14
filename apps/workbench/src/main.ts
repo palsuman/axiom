@@ -6,5 +6,7 @@ export {
   gitHistoryStore,
   gitStatusStore,
   settingsService,
+  settingsEditorService,
+  launchConfigurationEditorService,
   i18nService
 } from './boot/bootstrap-workbench';

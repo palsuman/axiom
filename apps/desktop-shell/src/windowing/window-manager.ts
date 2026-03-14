@@ -1,6 +1,7 @@
 import { BrowserWindow, nativeTheme } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
-import { log, logError } from '../system/logger';
+import { logError } from '../system/logger';
 import type { NexusEnv } from '@nexus/platform/config/env';
 import { WindowStateStore, StoredWindowState, WindowBounds } from '@nexus/platform/windowing/window-state';
 import { loadWorkspaceDescriptor, type WorkspaceDescriptor } from '@nexus/platform/workspace/workspace-descriptor';
@@ -22,7 +23,32 @@ type CreateWindowOptions = {
   descriptor?: WorkspaceDescriptor;
 };
 
+type WindowWebPreferencesOptions = {
+  preloadPath?: string;
+  additionalArguments?: string[];
+};
+
 const MAX_SNAPSHOTS = 8;
+
+export function resolvePreloadScriptPath(windowingDir = __dirname, exists: (candidatePath: string) => boolean = fs.existsSync) {
+  const candidates = [path.resolve(windowingDir, '../preload.js'), path.resolve(windowingDir, 'preload.js')];
+  for (const candidatePath of candidates) {
+    if (exists(candidatePath)) {
+      return candidatePath;
+    }
+  }
+  return candidates[0];
+}
+
+export function buildWindowWebPreferences(options: WindowWebPreferencesOptions = {}) {
+  return {
+    preload: options.preloadPath ?? resolvePreloadScriptPath(),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: false,
+    additionalArguments: options.additionalArguments?.length ? options.additionalArguments : undefined
+  };
+}
 
 export class WindowManager {
   private windows = new Map<string, BrowserWindow>();
@@ -68,12 +94,7 @@ export class WindowManager {
       show: false,
       backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
       title: titleLabel ? `Nexus IDE — ${titleLabel}` : 'Nexus IDE',
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        additionalArguments: additionalArguments.length ? additionalArguments : undefined
-      }
+      webPreferences: buildWindowWebPreferences({ additionalArguments })
     });
 
     window.once('ready-to-show', () => {
@@ -283,9 +304,43 @@ export class WindowManager {
 
   private getStartUrl(workspace?: string) {
     const workspaceLabel = workspace ? this.escapeHtml(workspace) : 'Not set';
-    const message = encodeURIComponent(
-      `<style>body{background:#1e1e1e;color:#fff;font-family:system-ui, sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}h1{margin-bottom:0.25rem;font-size:2rem;text-align:center;}p{text-align:center;margin:0;opacity:0.8;}code{display:inline-block;margin-top:0.5rem;padding:0.25rem 0.5rem;background:rgba(255,255,255,0.1);border-radius:4px;}</style><body><div><h1>Nexus IDE</h1><p>ENV: ${this.env.nexusEnv}</p><p>Workspace: <code>${workspaceLabel}</code></p></div></body>`
-    );
+    const message = encodeURIComponent(`<!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Nexus IDE</title>
+          <style>
+            html, body {
+              width: 100%;
+              height: 100%;
+              margin: 0;
+              background: #111111;
+            }
+            body::before {
+              content: "Loading Nexus IDE";
+              position: fixed;
+              inset: 16px auto auto 16px;
+              color: rgba(255,255,255,0.55);
+              font: 500 12px/1.2 system-ui, sans-serif;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+            }
+            body::after {
+              content: "${workspaceLabel}";
+              position: fixed;
+              inset: auto auto 16px 16px;
+              max-width: calc(100vw - 32px);
+              color: rgba(255,255,255,0.42);
+              font: 400 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+          </style>
+        </head>
+        <body></body>
+      </html>`);
     return `data:text/html,${message}`;
   }
 

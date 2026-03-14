@@ -9,6 +9,7 @@ import {
   type SettingInspection,
   type SettingsApplyIssue,
   type SettingsApplyReport,
+  type SettingsScope,
   type SettingsChangeEvent,
   type SettingsSchemaDocument
 } from '@nexus/platform/settings/settings-registry';
@@ -21,7 +22,11 @@ import {
   type ThemeRuntime,
   type ThemeRuntimeSnapshot
 } from '@nexus/platform/theming/theme-runtime';
-import { isWorkspaceDescriptorFile, loadWorkspaceDescriptor } from '@nexus/platform/workspace/workspace-descriptor';
+import {
+  isWorkspaceDescriptorFile,
+  loadWorkspaceDescriptor,
+  saveWorkspaceDescriptorSettings
+} from '@nexus/platform/workspace/workspace-descriptor';
 import type { WorkbenchShell } from '../shell/workbench-shell';
 import type { I18nService } from '../i18n/i18n-service';
 
@@ -43,6 +48,7 @@ export type SettingsSnapshot = {
   readonly workspace: Record<string, unknown>;
   readonly resolved: Record<string, unknown>;
   readonly userSettingsPath: string;
+  readonly workspaceSettingsPath?: string;
   readonly workspacePath?: string;
 };
 
@@ -126,6 +132,7 @@ export function createDefaultSettingsDefinitions(defaultLocale: string, themeReg
 export class SettingsService {
   private readonly shell?: WorkbenchShell;
   private readonly workspacePath?: string;
+  private readonly workspaceSettingsPath?: string;
   private readonly userSettingsPath: string;
   private readonly logger: (message: string) => void;
   private readonly registry: SettingsRegistry;
@@ -138,6 +145,7 @@ export class SettingsService {
     const env = options.env ?? readEnv();
     this.shell = options.shell;
     this.workspacePath = options.workspacePath;
+    this.workspaceSettingsPath = resolveWorkspaceSettingsPath(options.workspacePath);
     this.userSettingsPath = path.resolve(options.userSettingsPath ?? path.join(env.nexusHome, 'settings', 'user.json'));
     this.logger = options.logger ?? (message => console.warn(message));
     this.registry = options.registry ?? new SettingsRegistry();
@@ -216,25 +224,58 @@ export class SettingsService {
       workspace: this.registry.getWorkspaceValues(),
       resolved: this.registry.getResolvedValues(),
       userSettingsPath: this.userSettingsPath,
+      workspaceSettingsPath: this.workspaceSettingsPath,
       workspacePath: this.workspacePath
     };
   }
 
-  updateUserSettings(values: Record<string, unknown>) {
-    const report = this.registry.applyValues('user', values, { source: 'api:user-settings' });
+  updateSettings(scope: SettingsScope, values: Record<string, unknown>, options?: { replace?: boolean; source?: string }) {
+    if (options?.replace) {
+      const currentValues = this.getScopeValues(scope);
+      Object.keys(currentValues).forEach(key => {
+        if (!(key in values)) {
+          this.registry.removeValue(scope, key, { source: options.source });
+        }
+      });
+    }
+    const report = this.registry.applyValues(scope, values, { source: options?.source ?? `api:${scope}-settings` });
     this.logIssues(report);
-    this.persistUserSettings();
+    this.persistScopeSettings(scope);
     return this.snapshot();
+  }
+
+  updateUserSettings(values: Record<string, unknown>) {
+    return this.updateSettings('user', values);
+  }
+
+  updateSetting(scope: SettingsScope, key: string, value: unknown) {
+    return this.updateSettings(scope, { [key]: value });
   }
 
   updateUserSetting(key: string, value: unknown) {
-    return this.updateUserSettings({ [key]: value });
+    return this.updateSetting('user', key, value);
+  }
+
+  removeSetting(scope: SettingsScope, key: string) {
+    this.registry.removeValue(scope, key, { source: `api:${scope}-settings` });
+    this.persistScopeSettings(scope);
+    return this.snapshot();
   }
 
   removeUserSetting(key: string) {
-    this.registry.removeValue('user', key, { source: 'api:user-settings' });
-    this.persistUserSettings();
-    return this.snapshot();
+    return this.removeSetting('user', key);
+  }
+
+  getScopeValues(scope: SettingsScope) {
+    return scope === 'user' ? this.registry.getUserValues() : this.registry.getWorkspaceValues();
+  }
+
+  supportsScope(scope: SettingsScope) {
+    return scope === 'user' || Boolean(this.workspaceSettingsPath);
+  }
+
+  getScopeFilePath(scope: SettingsScope) {
+    return scope === 'user' ? this.userSettingsPath : this.workspaceSettingsPath;
   }
 
   onDidChange(listener: (event: SettingsChangeEvent) => void) {
@@ -293,13 +334,15 @@ export class SettingsService {
   }
 
   private readWorkspaceSettings() {
-    if (!this.workspacePath || !isWorkspaceDescriptorFile(this.workspacePath) || !fs.existsSync(this.workspacePath)) {
+    if (!this.workspaceSettingsPath || !fs.existsSync(this.workspaceSettingsPath)) {
       return {};
     }
     try {
-      return loadWorkspaceDescriptor(this.workspacePath).settings ?? {};
+      return loadWorkspaceDescriptor(this.workspaceSettingsPath).settings ?? {};
     } catch (error) {
-      this.logger(`[settings] Failed to load workspace settings from ${this.workspacePath}: ${(error as Error).message}`);
+      this.logger(
+        `[settings] Failed to load workspace settings from ${this.workspaceSettingsPath}: ${(error as Error).message}`
+      );
       return {};
     }
   }
@@ -327,6 +370,28 @@ export class SettingsService {
     fs.writeFileSync(this.userSettingsPath, JSON.stringify(sortObject(this.registry.getUserValues()), null, 2), 'utf8');
   }
 
+  private persistWorkspaceSettings() {
+    if (!this.workspaceSettingsPath) {
+      this.logger('[settings] Workspace settings are unavailable because no workspace target is active');
+      return;
+    }
+    const persistedPath = saveWorkspaceDescriptorSettings(
+      this.workspacePath ?? this.workspaceSettingsPath,
+      sortObject(this.registry.getWorkspaceValues())
+    );
+    if (persistedPath !== this.workspaceSettingsPath) {
+      this.logger(`[settings] Workspace settings persisted to ${persistedPath}`);
+    }
+  }
+
+  private persistScopeSettings(scope: SettingsScope) {
+    if (scope === 'user') {
+      this.persistUserSettings();
+      return;
+    }
+    this.persistWorkspaceSettings();
+  }
+
   private logIssues(report: SettingsApplyReport) {
     report.issues.forEach(issue => {
       this.logger(formatIssue(issue));
@@ -346,4 +411,27 @@ function sortObject(values: Record<string, unknown>) {
 function formatIssue(issue: SettingsApplyIssue) {
   const sourceSuffix = issue.source ? ` [source=${issue.source}]` : '';
   return `[settings] ${issue.message}${sourceSuffix}`;
+}
+
+function resolveWorkspaceSettingsPath(workspacePath?: string) {
+  if (!workspacePath) {
+    return undefined;
+  }
+  const resolved = path.resolve(workspacePath);
+  if (fs.existsSync(resolved)) {
+    const stats = fs.statSync(resolved);
+    if (stats.isFile() && isWorkspaceDescriptorFile(resolved)) {
+      return resolved;
+    }
+    if (stats.isDirectory()) {
+      return path.join(resolved, '.nexus-workspace.json');
+    }
+    if (stats.isFile()) {
+      return path.join(path.dirname(resolved), '.nexus-workspace.json');
+    }
+  }
+  if (isWorkspaceDescriptorFile(resolved)) {
+    return resolved;
+  }
+  return path.join(path.dirname(resolved), '.nexus-workspace.json');
 }

@@ -27,6 +27,11 @@ export type CoreChannel =
   | 'nexus:fs:copy'
   | 'nexus:fs:delete'
   | 'nexus:fs:undo'
+  | 'nexus:run-config:load'
+  | 'nexus:run-config:save'
+  | 'nexus:debug:start'
+  | 'nexus:debug:stop'
+  | 'nexus:debug:event'
   | 'nexus:workspace-backup:save'
   | 'nexus:workspace-backup:load'
   | 'nexus:workspace-backup:clear';
@@ -324,4 +329,93 @@ export type WorkspaceBackupWriteResult = {
   terminals: number;
   runConfigs: number;
   truncated?: boolean;
+};
+
+export type RunConfigurationIssue = {
+  path: string;
+  message: string;
+};
+
+export type RunConfigurationLoadResponse = {
+  path: string;
+  exists: boolean;
+  text: string;
+  issues: RunConfigurationIssue[];
+};
+
+export type RunConfigurationSavePayload = {
+  text: string;
+};
+
+export type RunConfigurationSaveResponse = {
+  path: string;
+  saved: boolean;
+  text: string;
+  issues: RunConfigurationIssue[];
+};
+
+export type DebugBreakpointPayload = {
+  source: string;
+  lines: number[];
+};
+
+export type DebugSessionStartPayload = {
+  configurationName?: string;
+  configurationIndex?: number;
+  stopOnEntry?: boolean;
+  breakpoints?: DebugBreakpointPayload[];
+};
+
+export type DebugSessionStopPayload = {
+  sessionId?: string;
+  terminateDebuggee?: boolean;
+};
+
+export type DebugSource = {
+  name?: string;
+  path?: string;
+};
+
+export type DebugStackFrame = {
+  id: number;
+  name: string;
+  source?: DebugSource;
+  line: number;
+  column: number;
+};
+
+export type DebugSessionState = 'starting' | 'running' | 'stopped' | 'terminated' | 'failed';
+
+export type DebugSessionSnapshot = {
+  sessionId: string;
+  workspaceSessionId: string;
+  ownerWebContentsId: number;
+  configurationName: string;
+  adapterType: string;
+  request: 'launch' | 'attach';
+  startedAt: number;
+  state: DebugSessionState;
+  reason?: string;
+  threadId?: number;
+  stackFrames: DebugStackFrame[];
+};
+
+export type DebugSessionStopResponse = {
+  sessionId: string;
+  stopped: boolean;
+  state: DebugSessionState;
+};
+
+export type DebugOutputEvent = {
+  category: 'stdout' | 'stderr' | 'console';
+  output: string;
+};
+
+export type DebugSessionEvent = {
+  sessionId: string;
+  kind: 'started' | 'stopped' | 'continued' | 'terminated' | 'output' | 'error';
+  timestamp: number;
+  snapshot?: DebugSessionSnapshot;
+  output?: DebugOutputEvent;
+  message?: string;
 };

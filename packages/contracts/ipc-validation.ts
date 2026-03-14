@@ -1,6 +1,8 @@
 import type {
   CopyEntriesPayload,
   CreateEntryPayload,
+  DebugSessionStartPayload,
+  DebugSessionStopPayload,
   DeleteEntriesPayload,
   FsEntryKind,
   GitCommitPayload,
@@ -11,6 +13,7 @@ import type {
   LogPayload,
   MoveEntriesPayload,
   OpenWorkspacePayload,
+  RunConfigurationSavePayload,
   RenameEntryPayload,
   TerminalCreatePayload,
   TerminalDisposePayload,
@@ -187,6 +190,34 @@ const payloadValidators = {
     const value = asObject(payload, 'payload');
     return {
       token: readString(value, 'token', { minLength: 1 })
+    };
+  },
+  'nexus:run-config:save': (payload: unknown): RunConfigurationSavePayload => {
+    const value = asObject(payload, 'payload');
+    return {
+      text: readString(value, 'text', { trim: false })
+    };
+  },
+  'nexus:debug:start': (payload: unknown): DebugSessionStartPayload => {
+    const value = asObject(payload, 'payload');
+    const breakpointEntries = Object.prototype.hasOwnProperty.call(value, 'breakpoints')
+      ? readObjectArray(value, 'breakpoints')
+      : undefined;
+    return {
+      configurationName: readString(value, 'configurationName', { optional: true, allowEmpty: false }),
+      configurationIndex: readInteger(value, 'configurationIndex', { optional: true, min: 0 }),
+      stopOnEntry: readBoolean(value, 'stopOnEntry', { optional: true }),
+      breakpoints: breakpointEntries?.map((entry, index) => ({
+        source: readString(entry, 'source', { minLength: 1, label: `breakpoints[${index}].source` }),
+        lines: readIntegerArray(entry, 'lines', { minItems: 1, min: 1, label: `breakpoints[${index}].lines` })
+      }))
+    };
+  },
+  'nexus:debug:stop': (payload: unknown): DebugSessionStopPayload => {
+    const value = asObject(payload, 'payload');
+    return {
+      sessionId: readString(value, 'sessionId', { optional: true, allowEmpty: false }),
+      terminateDebuggee: readBoolean(value, 'terminateDebuggee', { optional: true })
     };
   },
   'nexus:workspace-backup:save': (payload: unknown): WorkspaceBackupSavePayload => {
@@ -476,6 +507,50 @@ function readStringArray(
       throw new IpcValidationError(label, [`${label}[${index}] must be a non-empty string`]);
     }
     return item.trim();
+  });
+  if (options.minItems !== undefined && normalized.length < options.minItems) {
+    throw new IpcValidationError(label, [`${label} must contain at least ${options.minItems} item(s)`]);
+  }
+  return normalized;
+}
+
+function readIntegerArray(
+  value: Record<string, unknown>,
+  key: string,
+  options?: { optional?: false; minItems?: number; min?: number; max?: number; label?: string }
+): number[];
+function readIntegerArray(
+  value: Record<string, unknown>,
+  key: string,
+  options: { optional: true; minItems?: number; min?: number; max?: number; label?: string }
+): number[] | undefined;
+function readIntegerArray(
+  value: Record<string, unknown>,
+  key: string,
+  options: { optional?: boolean; minItems?: number; min?: number; max?: number; label?: string } = {}
+) {
+  const label = options.label ?? key;
+  const raw = value[key];
+  if (raw === undefined || raw === null) {
+    if (options.optional) {
+      return undefined;
+    }
+    throw new IpcValidationError(label, [`${label} is required`]);
+  }
+  if (!Array.isArray(raw)) {
+    throw new IpcValidationError(label, [`${label} must be an array`]);
+  }
+  const normalized = raw.map((item, index) => {
+    if (typeof item !== 'number' || !Number.isFinite(item) || !Number.isInteger(item)) {
+      throw new IpcValidationError(label, [`${label}[${index}] must be an integer`]);
+    }
+    if (options.min !== undefined && item < options.min) {
+      throw new IpcValidationError(label, [`${label}[${index}] must be >= ${options.min}`]);
+    }
+    if (options.max !== undefined && item > options.max) {
+      throw new IpcValidationError(label, [`${label}[${index}] must be <= ${options.max}`]);
+    }
+    return item;
   });
   if (options.minItems !== undefined && normalized.length < options.minItems) {
     throw new IpcValidationError(label, [`${label} must contain at least ${options.minItems} item(s)`]);

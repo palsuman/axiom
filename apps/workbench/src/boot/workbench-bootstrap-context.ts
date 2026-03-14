@@ -8,7 +8,10 @@ import { GitCommitStore } from '../scm/git-commit-store';
 import { GitHistoryStore } from '../scm/git-history-store';
 import { GitRepositoryStore } from '../scm/git-repository-store';
 import { GitStatusStore } from '../scm/git-status-store';
+import { SettingsEditorService } from '../settings/settings-editor-service';
 import { SettingsService } from '../settings/settings-service';
+import { DebugSessionStore } from '../run-debug/debug-session-store';
+import { LaunchConfigurationEditorService } from '../run-debug/launch-configuration-editor-service';
 import { WorkspaceHotExitService } from '../workspace/workspace-hot-exit-service';
 import type { ThemeRuntime } from '@nexus/platform/theming/theme-runtime';
 
@@ -31,6 +34,9 @@ export type WorkbenchBootstrapContext = {
   gitCommitStore: GitCommitStore;
   gitHistoryStore: GitHistoryStore;
   settingsService: SettingsService;
+  settingsEditorService: SettingsEditorService;
+  debugSessionStore: DebugSessionStore;
+  launchConfigurationEditorService: LaunchConfigurationEditorService;
   themeRuntime: ThemeRuntime;
 };
 
@@ -60,6 +66,15 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
   });
 
   settingsService.initialize();
+  const settingsEditorService = new SettingsEditorService({
+    settingsService,
+    shell
+  });
+  const debugSessionStore = new DebugSessionStore(workspaceBridge);
+  const launchConfigurationEditorService = new LaunchConfigurationEditorService({
+    shell,
+    bridge: workspaceBridge
+  });
   const themeRuntime = settingsService.getThemeRuntime();
 
   return {
@@ -79,11 +94,15 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     gitCommitStore,
     gitHistoryStore,
     settingsService,
+    settingsEditorService,
+    debugSessionStore,
+    launchConfigurationEditorService,
     themeRuntime
   };
 }
 
 export function disposeWorkbenchBootstrapContext(context: WorkbenchBootstrapContext) {
+  context.debugSessionStore.dispose();
   context.workspaceStateService.dispose();
   context.layoutHandle.dispose();
   context.hotExitService.dispose();
