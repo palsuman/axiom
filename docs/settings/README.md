@@ -1,9 +1,9 @@
 # Settings Schema + Registry
 
-`IDE-106` establishes the typed settings foundation for Nexus. The implementation has two layers:
+`IDE-106` establishes the typed settings foundation for Nexus. `IDE-199` extends that foundation so theme selection flows through a shared runtime instead of isolated shell updates. The implementation has two layers:
 
 - `packages/platform/settings/settings-registry.ts` provides a shared registry for declaring settings, validating values, exporting a schema document, and resolving precedence across defaults, user values, and workspace overrides.
-- `apps/workbench/src/settings/settings-service.ts` loads persisted user settings from `${NEXUS_HOME}/settings/user.json`, merges workspace descriptor settings from `.nexus-workspace.json`, applies shell-facing settings, and exposes the resolved settings API to the workbench bootstrap.
+- `apps/workbench/src/settings/settings-service.ts` loads persisted user settings from `${NEXUS_HOME}/settings/user.json`, merges workspace descriptor settings from `.nexus-workspace.json`, applies shell-facing settings, owns the shared theme runtime, and exposes the resolved settings API to the workbench bootstrap.
 
 ## Precedence and scopes
 
@@ -35,7 +35,7 @@ The initial registry ships these built-in settings:
 - `editor.wordWrap`
 - `terminal.integrated.fontSize`
 
-The service already applies the resolved theme to `WorkbenchShell` and reflects locale/theme metadata onto `document.documentElement`, which gives later foundation work on theming (`IDE-021`), i18n (`IDE-181`), and settings UI (`IDE-107`) a stable backend contract.
+The service already applies the resolved theme to `WorkbenchShell`, reflects locale/theme metadata onto `document.documentElement`, and keeps the shared theme runtime in sync with persisted settings. That gives later work on theming (`IDE-021`, `IDE-202`), i18n (`IDE-181`), and settings UI (`IDE-107`) a stable backend contract.
 
 ## Workbench API
 
@@ -46,7 +46,24 @@ The service already applies the resolved theme to `WorkbenchShell` and reflects 
 - `updateUserSettings(values)` and `updateUserSetting(key, value)` for mutations
 - `removeUserSetting(key)` for cleanup
 - `getSchema()` / `snapshot()` for UI and tooling consumers
+- `getThemeRuntime()` to access the shared workbench theme runtime
 - `onDidChange(listener)` for reactive integrations
+
+## Theme Runtime Flow
+
+- `workbench.colorTheme` remains a typed settings key declared in the shared registry.
+- `SettingsService` translates that setting into `ThemeRuntime.setTheme(...)`, rather than resolving registry colors ad hoc in each UI surface.
+- The active runtime snapshot then feeds:
+  - shell CSS variables and metadata
+  - editor theme conversion through `MonacoEditorService.bindThemeRuntime(...)`
+  - terminal theme conversion through `TerminalHost.bindThemeRuntime(...)`
+- The shared runtime now carries design tokens beyond color, so the same settings flow also drives:
+  - workbench typography CSS variables
+  - spacing/radius/focus tokens
+  - icon sizing tokens
+  - layout sizing tokens such as activity bar width and status bar height
+
+This keeps theme state authoritative in one place and avoids renderer subsystems drifting onto separate color pipelines.
 
 Hidden commands are also registered for test and integration use:
 
@@ -55,5 +72,5 @@ Hidden commands are also registered for test and integration use:
 
 ## Verification
 
-- `nx run platform:test`
-- `nx run workbench:test`
+- `yarn nx run platform:test --runInBand`
+- `yarn nx run workbench:test --runInBand`

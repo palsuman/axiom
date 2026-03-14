@@ -17,8 +17,10 @@
 ### Editor service (`apps/workbench/src/editor/monaco-service.ts`)
 1. Accepts simple `MonacoEditorInit` descriptors (URI, language, initial value, tabSize, readonly).
 2. Pools Monaco models by URI, reference-counting them as editors open/close. When the last editor using a model is disposed the model is disposed to free memory.
-3. `updateWorkbenchTheme` converts workbench tokens into Monaco theme definitions. Theme updates queue if Monaco isn’t loaded yet and apply automatically as soon as the loader resolves.
-4. Provides helper APIs (`updateModelContent`, `disposeEditor`, `disposeAll`) used by docked editors, diff views, AI inline previews, etc.
+3. `updateWorkbenchTheme` converts workbench tokens into Monaco theme definitions and editor options. Theme updates queue if Monaco isn’t loaded yet and apply automatically as soon as the loader resolves.
+4. `bindThemeRuntime(...)` subscribes Monaco to the shared `ThemeRuntime`, using `toMonacoThemeDefinition(...)` so editor colors, font family, font size, and line height stay aligned with the shell and terminal.
+5. Reapplies runtime-derived editor options to already-open editors, so typography changes do not require reopening editors.
+6. Provides helper APIs (`updateModelContent`, `disposeEditor`, `disposeAll`) used by docked editors, diff views, AI inline previews, etc.
 
 ## Usage
 ```ts
@@ -38,6 +40,13 @@ const editor = await editorService.createEditor({
 ```
 
 When shipping the Electron bundle, include the Monaco distribution under `resources/monaco/vs` (or configure `basePath` to point at a `.nexus` directory). Workers load via generated `data:` URLs so no `file://` CSP tweaks are required.
+
+## Theme Flow
+- The canonical theme source lives in `packages/platform/theming/theme-runtime.ts`.
+- `SettingsService` owns the active runtime and updates it from `workbench.colorTheme`.
+- `MonacoEditorService.bindThemeRuntime(...)` consumes runtime snapshots and converts them into Monaco theme definitions without duplicating resolution rules in the editor layer.
+- The runtime now carries design tokens beyond color, so Monaco also adopts shared typography tokens (`font.family.mono`, `font.size.md`, `font.lineHeight.normal`) from the same pipeline.
+- This keeps Monaco on the same semantic token pipeline as shell CSS variables and the integrated terminal.
 
 ### Text model manager (`apps/workbench/src/editor/text-model-manager.ts`)
 IDE-042 extends the editor platform with a persistence-aware text model lifecycle controller:

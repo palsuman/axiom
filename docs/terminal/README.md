@@ -26,12 +26,24 @@
   - Thin wrapper around the preload bridge for easier mocking in tests.
 - `apps/workbench/src/terminal/terminal-host.ts`
   - Uses `xterm` + `fit` addon to render a terminal surface inside the workbench panel area.
-  - Handles theme awareness, resizing, cleanup, and forwards keyboard input to the PTY.
+  - Handles resizing, cleanup, terminal snapshot buffering, and forwards keyboard input to the PTY.
+  - Exposes `bindThemeRuntime(...)` so terminal colors, ANSI palette, and terminal typography track the shared workbench theme runtime instead of owning a separate theme source.
 - `apps/workbench/src/boot/workbench-bootstrap-runtime.ts`
   - Mounts a default terminal surface when running in a browser context and wires lifecycle disposal.
   - Attaches the terminal host to hot-exit persistence during runtime startup.
+  - Seeds terminal colors from the shared `ThemeRuntime` snapshot and binds ongoing runtime updates.
 - `apps/workbench/src/boot/bootstrap-workbench.ts`
   - Remains the thin renderer entry module delegating to context, contribution, command, and runtime bootstrap pieces.
+
+## Theme Integration
+- The shared theme source lives in `packages/platform/theming/theme-runtime.ts`.
+- `TerminalHost` consumes runtime snapshots through `toTerminalThemeDefinition(...)`, keeping the terminal aligned with the active workbench theme.
+- The runtime-derived terminal payload now includes:
+  - background/foreground
+  - cursor and selection colors
+  - full ANSI 16-color palette
+  - shared mono font family, font size, and line height
+- The terminal host also reflects those values onto the host DOM container, so CSS-backed shell surfaces and xterm stay visually consistent during theme switches.
 
 ## Contracts
 Defined in `packages/contracts/ipc.ts`:
@@ -60,3 +72,6 @@ Events: `TerminalDataEvent` + `TerminalExitEvent`.
 - Creating a terminal spawns the OS-default shell (respecting overrides) and streams output/input without blocking the main thread.
 - Resizing the window propagates new cols/rows to the PTY and xterm instance using `fit`.
 - Closing a window or switching workspaces disposes PTYs, preventing stray processes.
+
+## Verification
+- `yarn nx run workbench:test --runInBand`

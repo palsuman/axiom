@@ -2,6 +2,26 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+jest.mock('xterm', () => ({
+  Terminal: jest.fn().mockImplementation(() => ({
+    cols: 80,
+    rows: 24,
+    loadAddon: jest.fn(),
+    open: jest.fn(),
+    onData: jest.fn(),
+    write: jest.fn(),
+    writeln: jest.fn(),
+    dispose: jest.fn(),
+    setOption: jest.fn()
+  }))
+}));
+
+jest.mock('xterm-addon-fit', () => ({
+  FitAddon: jest.fn().mockImplementation(() => ({
+    fit: jest.fn()
+  }))
+}));
+
 function createNexusBridge() {
   return {
     openWorkspace: jest.fn().mockResolvedValue(undefined),
@@ -72,17 +92,20 @@ function createNexusBridge() {
 describe('workbench shell bootstrap', () => {
   const tmpRoot = path.join(os.tmpdir(), 'nexus-workbench-main-spec-');
   const globalWindow = globalThis as typeof globalThis & { window?: Window & typeof globalThis };
+  const globalScope = globalThis as typeof globalThis;
   let workspaceDir: string;
   const originalWorkspaceData = process.env.NEXUS_WORKSPACE_DATA;
   const originalWorkspaceId = process.env.NEXUS_WORKSPACE_ID;
   const originalNexusHome = process.env.NEXUS_HOME;
   const originalWindow = globalWindow.window;
+  const originalSelf = (globalScope as { self?: unknown }).self;
 
   beforeAll(() => {
     workspaceDir = fs.mkdtempSync(tmpRoot);
     process.env.NEXUS_WORKSPACE_DATA = workspaceDir;
     process.env.NEXUS_WORKSPACE_ID = 'spec-workspace';
     process.env.NEXUS_HOME = workspaceDir;
+    (globalScope as { self?: unknown }).self = globalThis;
     globalWindow.window = { nexus: createNexusBridge() } as unknown as Window & typeof globalThis;
   });
 
@@ -107,6 +130,11 @@ describe('workbench shell bootstrap', () => {
       Reflect.deleteProperty(globalWindow, 'window');
     } else {
       globalWindow.window = originalWindow;
+    }
+    if (originalSelf === undefined) {
+      Reflect.deleteProperty(globalScope as Record<string, unknown>, 'self');
+    } else {
+      (globalScope as { self?: unknown }).self = originalSelf;
     }
   });
 

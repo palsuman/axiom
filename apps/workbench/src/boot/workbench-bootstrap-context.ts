@@ -10,6 +10,7 @@ import { GitRepositoryStore } from '../scm/git-repository-store';
 import { GitStatusStore } from '../scm/git-status-store';
 import { SettingsService } from '../settings/settings-service';
 import { WorkspaceHotExitService } from '../workspace/workspace-hot-exit-service';
+import type { ThemeRuntime } from '@nexus/platform/theming/theme-runtime';
 
 type NexusBridge = typeof window.nexus | undefined;
 
@@ -30,6 +31,7 @@ export type WorkbenchBootstrapContext = {
   gitCommitStore: GitCommitStore;
   gitHistoryStore: GitHistoryStore;
   settingsService: SettingsService;
+  themeRuntime: ThemeRuntime;
 };
 
 export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
@@ -58,6 +60,7 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
   });
 
   settingsService.initialize();
+  const themeRuntime = settingsService.getThemeRuntime();
 
   return {
     env,
@@ -75,7 +78,8 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     gitStatusStore,
     gitCommitStore,
     gitHistoryStore,
-    settingsService
+    settingsService,
+    themeRuntime
   };
 }
 

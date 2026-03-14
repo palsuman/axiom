@@ -1,22 +1,73 @@
-export const THEME_COLOR_SLOTS = [
-  'workbench.background',
-  'activityBar.background',
-  'sidebar.background',
-  'panel.background',
-  'statusBar.background',
-  'statusBar.foreground',
-  'editor.background',
-  'editor.foreground',
-  'editor.selectionBackground',
-  'editor.lineHighlightBackground',
-  'editor.commentForeground',
-  'terminal.background',
-  'terminal.foreground'
-] as const;
+import {
+  DEFAULT_THEME_COLORS_BY_KIND,
+  THEME_COLOR_SLOTS,
+  THEME_ICON_SLOTS,
+  THEME_LAYOUT_SLOTS,
+  THEME_SPACING_SLOTS,
+  THEME_TYPOGRAPHY_SLOTS,
+  createDefaultThemeTokens,
+  isThemeColorSlot,
+  isThemeIconSlot,
+  isThemeLayoutSlot,
+  isThemeSpacingSlot,
+  isThemeTypographySlot,
+  isValidThemeColorValue,
+  isValidThemeIconValue,
+  isValidThemeLayoutValue,
+  isValidThemeSpacingValue,
+  isValidThemeTypographyValue,
+  toCssVariables,
+  type ThemeBase,
+  type ThemeColorSlot,
+  type ThemeColorTokens,
+  type ThemeIconSlot,
+  type ThemeIconTokens,
+  type ThemeKind,
+  type ThemeLayoutSlot,
+  type ThemeLayoutTokens,
+  type ThemeSpacingSlot,
+  type ThemeSpacingTokens,
+  type ThemeTypographySlot,
+  type ThemeTypographyTokens
+} from './theme-token-catalog';
 
-export type ThemeColorSlot = (typeof THEME_COLOR_SLOTS)[number];
-export type ThemeKind = 'light' | 'dark' | 'high-contrast';
-export type ThemeBase = 'vs' | 'vs-dark' | 'hc-black';
+export {
+  DEFAULT_THEME_COLORS_BY_KIND,
+  DEFAULT_THEME_LAYOUT_TOKENS,
+  THEME_COLOR_SLOTS,
+  THEME_CSS_VARIABLES_BY_SLOT,
+  THEME_ICON_SLOTS,
+  THEME_LAYOUT_SLOTS,
+  THEME_SPACING_SLOTS,
+  THEME_TYPOGRAPHY_SLOTS,
+  createDefaultThemeCssVariables,
+  createDefaultThemeTokens,
+  isThemeColorSlot,
+  isThemeIconSlot,
+  isThemeLayoutSlot,
+  isThemeSpacingSlot,
+  isThemeTypographySlot,
+  isValidThemeColorValue,
+  isValidThemeIconValue,
+  isValidThemeLayoutValue,
+  isValidThemeSpacingValue,
+  isValidThemeTypographyValue,
+  toCssVariables,
+  type ThemeBase,
+  type ThemeColorSlot,
+  type ThemeColorTokens,
+  type ThemeDesignTokens,
+  type ThemeIconSlot,
+  type ThemeIconTokens,
+  type ThemeKind,
+  type ThemeLayoutSlot,
+  type ThemeLayoutTokens,
+  type ThemeManifestTokens,
+  type ThemeSpacingSlot,
+  type ThemeSpacingTokens,
+  type ThemeTypographySlot,
+  type ThemeTypographyTokens
+} from './theme-token-catalog';
 
 export type ThemeManifest = {
   readonly id: string;
@@ -25,7 +76,11 @@ export type ThemeManifest = {
   readonly kind: ThemeKind;
   readonly extends?: string;
   readonly uiBaseTheme?: ThemeBase;
-  readonly colors: Partial<Record<ThemeColorSlot, string>>;
+  readonly colors?: Partial<Record<ThemeColorSlot, string>>;
+  readonly typography?: Partial<Record<ThemeTypographySlot, string>>;
+  readonly spacing?: Partial<Record<ThemeSpacingSlot, string>>;
+  readonly icons?: Partial<Record<ThemeIconSlot, string>>;
+  readonly layout?: Partial<Record<ThemeLayoutSlot, string>>;
 };
 
 export type ResolvedThemeDefinition = {
@@ -35,7 +90,11 @@ export type ResolvedThemeDefinition = {
   readonly kind: ThemeKind;
   readonly extends?: string;
   readonly uiBaseTheme: ThemeBase;
-  readonly colors: Record<ThemeColorSlot, string>;
+  readonly colors: ThemeColorTokens;
+  readonly typography: ThemeTypographyTokens;
+  readonly spacing: ThemeSpacingTokens;
+  readonly icons: ThemeIconTokens;
+  readonly layout: ThemeLayoutTokens;
   readonly cssVariables: Record<string, string>;
   readonly inheritanceChain: readonly string[];
 };
@@ -49,77 +108,10 @@ export type ThemeSchemaDocument = {
   readonly properties: Record<string, unknown>;
 };
 
-const CSS_COLOR_PATTERN =
-  /^(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgb|hsl)a?\([^)]+\)|var\(--[A-Za-z0-9-_]+\))$/;
-
 const THEME_BASE_BY_KIND: Record<ThemeKind, ThemeBase> = {
   light: 'vs',
   dark: 'vs-dark',
   'high-contrast': 'hc-black'
-};
-
-const CSS_VARIABLES_BY_SLOT: Record<ThemeColorSlot, string> = {
-  'workbench.background': '--nexus-workbench-bg',
-  'activityBar.background': '--nexus-activity-bar-bg',
-  'sidebar.background': '--nexus-sidebar-bg',
-  'panel.background': '--nexus-panel-bg',
-  'statusBar.background': '--nexus-status-bar-bg',
-  'statusBar.foreground': '--nexus-status-bar-fg',
-  'editor.background': '--nexus-editor-bg',
-  'editor.foreground': '--nexus-editor-fg',
-  'editor.selectionBackground': '--nexus-editor-selection-bg',
-  'editor.lineHighlightBackground': '--nexus-editor-line-highlight-bg',
-  'editor.commentForeground': '--nexus-editor-comment-fg',
-  'terminal.background': '--nexus-terminal-bg',
-  'terminal.foreground': '--nexus-terminal-fg'
-};
-
-const DEFAULT_THEME_COLORS_BY_KIND: Record<ThemeKind, Record<ThemeColorSlot, string>> = {
-  dark: {
-    'workbench.background': '#1e1e1e',
-    'activityBar.background': '#252526',
-    'sidebar.background': '#1f1f1f',
-    'panel.background': '#181818',
-    'statusBar.background': '#0d5cab',
-    'statusBar.foreground': '#ffffff',
-    'editor.background': '#1e1e1e',
-    'editor.foreground': '#d4d4d4',
-    'editor.selectionBackground': '#264f78',
-    'editor.lineHighlightBackground': '#2b2b2b50',
-    'editor.commentForeground': '#6a9955',
-    'terminal.background': '#181818',
-    'terminal.foreground': '#ffffff'
-  },
-  light: {
-    'workbench.background': '#f5f5f5',
-    'activityBar.background': '#e3e3e3',
-    'sidebar.background': '#ffffff',
-    'panel.background': '#fafafa',
-    'statusBar.background': '#005fb8',
-    'statusBar.foreground': '#ffffff',
-    'editor.background': '#ffffff',
-    'editor.foreground': '#24292f',
-    'editor.selectionBackground': '#add6ff',
-    'editor.lineHighlightBackground': '#f0f6fc',
-    'editor.commentForeground': '#6e7781',
-    'terminal.background': '#ffffff',
-    'terminal.foreground': '#24292f'
-  },
-  'high-contrast': {
-    'workbench.background': '#000000',
-    'activityBar.background': '#000000',
-    'sidebar.background': '#050505',
-    'panel.background': '#050505',
-    'statusBar.background': '#ffff00',
-    'statusBar.foreground': '#000000',
-    'editor.background': '#000000',
-    'editor.foreground': '#ffffff',
-    'editor.selectionBackground': '#f38518',
-    'editor.lineHighlightBackground': '#1a1a1a',
-    'editor.commentForeground': '#7ca668',
-    'terminal.background': '#000000',
-    'terminal.foreground': '#ffffff'
-  }
 };
 
 export const BUILTIN_THEME_MANIFESTS: readonly ThemeManifest[] = Object.freeze([
@@ -154,7 +146,7 @@ export const THEME_MANIFEST_SCHEMA: ThemeSchemaDocument = Object.freeze({
   title: 'Nexus Theme Manifest',
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'label', 'kind', 'colors'],
+  required: ['id', 'label', 'kind'],
   properties: {
     id: { type: 'string', minLength: 1 },
     label: { type: 'string', minLength: 1 },
@@ -162,16 +154,11 @@ export const THEME_MANIFEST_SCHEMA: ThemeSchemaDocument = Object.freeze({
     kind: { type: 'string', enum: ['light', 'dark', 'high-contrast'] },
     extends: { type: 'string', minLength: 1 },
     uiBaseTheme: { type: 'string', enum: ['vs', 'vs-dark', 'hc-black'] },
-    colors: {
-      type: 'object',
-      additionalProperties: false,
-      propertyNames: {
-        enum: [...THEME_COLOR_SLOTS]
-      },
-      patternProperties: {
-        '.*': { type: 'string', minLength: 1 }
-      }
-    }
+    colors: createSectionSchema(THEME_COLOR_SLOTS),
+    typography: createSectionSchema(THEME_TYPOGRAPHY_SLOTS),
+    spacing: createSectionSchema(THEME_SPACING_SLOTS),
+    icons: createSectionSchema(THEME_ICON_SLOTS),
+    layout: createSectionSchema(THEME_LAYOUT_SLOTS)
   }
 });
 
@@ -229,11 +216,27 @@ export class ThemeRegistry {
     seen.add(id);
 
     const inherited = manifest.extends ? this.resolveTheme(manifest.extends, seen) : undefined;
-    const baseColors = inherited ? inherited.colors : DEFAULT_THEME_COLORS_BY_KIND[manifest.kind];
+    const defaults = createDefaultThemeTokens(manifest.kind);
     const colors = {
-      ...baseColors,
-      ...manifest.colors
-    } as Record<ThemeColorSlot, string>;
+      ...(inherited?.colors ?? defaults.colors),
+      ...(manifest.colors ?? {})
+    };
+    const typography = {
+      ...(inherited?.typography ?? defaults.typography),
+      ...(manifest.typography ?? {})
+    };
+    const spacing = {
+      ...(inherited?.spacing ?? defaults.spacing),
+      ...(manifest.spacing ?? {})
+    };
+    const icons = {
+      ...(inherited?.icons ?? defaults.icons),
+      ...(manifest.icons ?? {})
+    };
+    const layout = {
+      ...(inherited?.layout ?? defaults.layout),
+      ...(manifest.layout ?? {})
+    };
     const inheritanceChain = inherited ? [...inherited.inheritanceChain, manifest.id] : [manifest.id];
     const uiBaseTheme = manifest.uiBaseTheme ?? inherited?.uiBaseTheme ?? THEME_BASE_BY_KIND[manifest.kind];
 
@@ -247,7 +250,17 @@ export class ThemeRegistry {
       extends: manifest.extends,
       uiBaseTheme,
       colors,
-      cssVariables: toCssVariables(colors),
+      typography,
+      spacing,
+      icons,
+      layout,
+      cssVariables: toCssVariables({
+        colors,
+        typography,
+        spacing,
+        icons,
+        layout
+      }),
       inheritanceChain
     };
   }
@@ -259,11 +272,17 @@ export function createDefaultThemeRegistry() {
   return registry;
 }
 
-export function toCssVariables(colors: Record<ThemeColorSlot, string>) {
-  return THEME_COLOR_SLOTS.reduce<Record<string, string>>((variables, slot) => {
-    variables[CSS_VARIABLES_BY_SLOT[slot]] = colors[slot];
-    return variables;
-  }, {});
+function createSectionSchema(slots: readonly string[]) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    propertyNames: {
+      enum: [...slots]
+    },
+    patternProperties: {
+      '.*': { type: 'string', minLength: 1 }
+    }
+  };
 }
 
 function normalizeManifest(manifest: ThemeManifest): ThemeManifest {
@@ -273,11 +292,22 @@ function normalizeManifest(manifest: ThemeManifest): ThemeManifest {
     label: manifest.label.trim(),
     description: manifest.description?.trim(),
     extends: manifest.extends?.trim(),
-    colors: Object.entries(manifest.colors).reduce<Partial<Record<ThemeColorSlot, string>>>((normalized, [slot, value]) => {
-      normalized[slot as ThemeColorSlot] = value.trim();
-      return normalized;
-    }, {})
+    colors: normalizeSection(manifest.colors),
+    typography: normalizeSection(manifest.typography),
+    spacing: normalizeSection(manifest.spacing),
+    icons: normalizeSection(manifest.icons),
+    layout: normalizeSection(manifest.layout)
   };
+}
+
+function normalizeSection<TSlot extends string>(section: Partial<Record<TSlot, string>> | undefined) {
+  if (!section) {
+    return undefined;
+  }
+  return Object.entries(section).reduce<Partial<Record<TSlot, string>>>((normalized, [slot, value]) => {
+    normalized[slot as TSlot] = String(value).trim();
+    return normalized;
+  }, {});
 }
 
 function validateManifest(manifest: ThemeManifest) {
@@ -287,16 +317,79 @@ function validateManifest(manifest: ThemeManifest) {
   if (!manifest.label) {
     throw new Error(`Theme "${manifest.id}" must have a label`);
   }
-  if (!manifest.colors || typeof manifest.colors !== 'object' || Array.isArray(manifest.colors)) {
-    throw new Error(`Theme "${manifest.id}" must declare a colors object`);
-  }
+  validateColorSection(manifest.id, manifest.colors);
+  validateTypographySection(manifest.id, manifest.typography);
+  validateSpacingSection(manifest.id, manifest.spacing);
+  validateIconSection(manifest.id, manifest.icons);
+  validateLayoutSection(manifest.id, manifest.layout);
+}
 
-  Object.entries(manifest.colors).forEach(([slot, value]) => {
-    if (!THEME_COLOR_SLOTS.includes(slot as ThemeColorSlot)) {
-      throw new Error(`Theme "${manifest.id}" defines unknown color slot "${slot}"`);
+function validateColorSection(themeId: string, section: ThemeManifest['colors']) {
+  if (!section) {
+    return;
+  }
+  Object.entries(section).forEach(([slot, value]) => {
+    if (!isThemeColorSlot(slot)) {
+      throw new Error(`Theme "${themeId}" defines unknown color slot "${slot}"`);
     }
-    if (!CSS_COLOR_PATTERN.test(value)) {
-      throw new Error(`Theme "${manifest.id}" defines invalid color value for "${slot}"`);
+    if (!isValidThemeColorValue(value)) {
+      throw new Error(`Theme "${themeId}" defines invalid color value for "${slot}"`);
+    }
+  });
+}
+
+function validateTypographySection(themeId: string, section: ThemeManifest['typography']) {
+  if (!section) {
+    return;
+  }
+  Object.entries(section).forEach(([slot, value]) => {
+    if (!isThemeTypographySlot(slot)) {
+      throw new Error(`Theme "${themeId}" defines unknown typography slot "${slot}"`);
+    }
+    if (!isValidThemeTypographyValue(slot, value)) {
+      throw new Error(`Theme "${themeId}" defines invalid typography value for "${slot}"`);
+    }
+  });
+}
+
+function validateSpacingSection(themeId: string, section: ThemeManifest['spacing']) {
+  if (!section) {
+    return;
+  }
+  Object.entries(section).forEach(([slot, value]) => {
+    if (!isThemeSpacingSlot(slot)) {
+      throw new Error(`Theme "${themeId}" defines unknown spacing slot "${slot}"`);
+    }
+    if (!isValidThemeSpacingValue(value)) {
+      throw new Error(`Theme "${themeId}" defines invalid spacing value for "${slot}"`);
+    }
+  });
+}
+
+function validateIconSection(themeId: string, section: ThemeManifest['icons']) {
+  if (!section) {
+    return;
+  }
+  Object.entries(section).forEach(([slot, value]) => {
+    if (!isThemeIconSlot(slot)) {
+      throw new Error(`Theme "${themeId}" defines unknown icon slot "${slot}"`);
+    }
+    if (!isValidThemeIconValue(value)) {
+      throw new Error(`Theme "${themeId}" defines invalid icon value for "${slot}"`);
+    }
+  });
+}
+
+function validateLayoutSection(themeId: string, section: ThemeManifest['layout']) {
+  if (!section) {
+    return;
+  }
+  Object.entries(section).forEach(([slot, value]) => {
+    if (!isThemeLayoutSlot(slot)) {
+      throw new Error(`Theme "${themeId}" defines unknown layout slot "${slot}"`);
+    }
+    if (!isValidThemeLayoutValue(value)) {
+      throw new Error(`Theme "${themeId}" defines invalid layout value for "${slot}"`);
     }
   });
 }

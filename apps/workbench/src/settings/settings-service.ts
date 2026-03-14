@@ -16,6 +16,11 @@ import {
   createDefaultThemeRegistry,
   type ThemeRegistry
 } from '@nexus/platform/theming/theme-registry';
+import {
+  createDefaultThemeRuntime,
+  type ThemeRuntime,
+  type ThemeRuntimeSnapshot
+} from '@nexus/platform/theming/theme-runtime';
 import { isWorkspaceDescriptorFile, loadWorkspaceDescriptor } from '@nexus/platform/workspace/workspace-descriptor';
 import type { WorkbenchShell } from '../shell/workbench-shell';
 import type { I18nService } from '../i18n/i18n-service';
@@ -29,6 +34,7 @@ export type SettingsServiceOptions = {
   registry?: SettingsRegistry;
   i18n?: I18nService;
   themeRegistry?: ThemeRegistry;
+  themeRuntime?: ThemeRuntime;
 };
 
 export type SettingsSnapshot = {
@@ -126,6 +132,7 @@ export class SettingsService {
   private readonly workspaceKeys = new Set<string>();
   private readonly i18n?: I18nService;
   private readonly themeRegistry: ThemeRegistry;
+  private readonly themeRuntime: ThemeRuntime;
 
   constructor(options: SettingsServiceOptions = {}) {
     const env = options.env ?? readEnv();
@@ -136,11 +143,21 @@ export class SettingsService {
     this.registry = options.registry ?? new SettingsRegistry();
     this.i18n = options.i18n;
     this.themeRegistry = options.themeRegistry ?? createDefaultThemeRegistry();
+    this.themeRuntime =
+      options.themeRuntime ??
+      createDefaultThemeRuntime({
+        registry: this.themeRegistry,
+        initialThemeId: 'Nexus Dark',
+        fallbackThemeId: 'Nexus Dark'
+      });
     if (!options.registry) {
       this.registry.registerMany(createDefaultSettingsDefinitions(env.defaultLocale, this.themeRegistry));
     }
     this.registry.onDidChange(event => {
       this.handleRegistryChange(event);
+    });
+    this.themeRuntime.onDidChange(event => {
+      this.applyThemeSnapshot(event.snapshot);
     });
   }
 
@@ -224,24 +241,28 @@ export class SettingsService {
     return this.registry.onDidChange(listener);
   }
 
+  getThemeRuntime() {
+    return this.themeRuntime;
+  }
+
   private handleRegistryChange(event: SettingsChangeEvent) {
-    if (event.key === 'workbench.colorTheme' || event.key === 'workbench.locale' || event.key === 'window.zoomLevel') {
-      this.applyShellSettings();
+    if (event.key === 'workbench.colorTheme') {
+      this.applyThemeSelection();
+      this.applyDocumentSettings();
+      return;
+    }
+    if (event.key === 'workbench.locale' || event.key === 'window.zoomLevel') {
+      this.applyDocumentSettings();
     }
   }
 
   private applyShellSettings() {
-    this.applyShellTheme();
+    this.applyThemeSelection();
     this.applyDocumentSettings();
   }
 
-  private applyShellTheme() {
-    if (!this.shell) {
-      return;
-    }
-    const themeId = this.get<string>('workbench.colorTheme');
-    const resolvedTheme = this.resolveTheme(themeId);
-    this.shell.applyThemeOverrides(resolvedTheme.cssVariables);
+  private applyThemeSelection() {
+    this.applyThemeSnapshot(this.themeRuntime.setTheme(this.get<string>('workbench.colorTheme')));
   }
 
   private applyDocumentSettings() {
@@ -250,7 +271,7 @@ export class SettingsService {
     if (typeof document === 'undefined') {
       return;
     }
-    const theme = this.resolveTheme(this.get<string>('workbench.colorTheme'));
+    const theme = this.themeRuntime.getSnapshot().theme;
     const zoomLevel = this.get<number>('window.zoomLevel');
 
     document.documentElement.lang = locale;
@@ -259,11 +280,16 @@ export class SettingsService {
     document.documentElement.style.setProperty('--nexus-zoom-level', String(zoomLevel));
   }
 
-  private resolveTheme(themeId: string) {
-    if (this.themeRegistry.has(themeId)) {
-      return this.themeRegistry.resolve(themeId);
+  private applyThemeSnapshot(snapshot: ThemeRuntimeSnapshot) {
+    this.shell?.applyThemeOverrides(snapshot.cssVariables);
+    if (typeof document === 'undefined') {
+      return;
     }
-    return this.themeRegistry.resolve('Nexus Dark');
+    Object.entries(snapshot.cssVariables).forEach(([name, value]) => {
+      document.documentElement.style.setProperty(name, value);
+    });
+    document.documentElement.dataset.nexusTheme = snapshot.theme.id;
+    document.documentElement.dataset.nexusThemeKind = snapshot.theme.kind;
   }
 
   private readWorkspaceSettings() {

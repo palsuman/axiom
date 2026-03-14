@@ -60,7 +60,11 @@ describe('SettingsService', () => {
       'editor.tabSize': 4
     });
     expect(service.get('files.encoding')).toBe('utf16le');
-    expect(shell.getThemeTokens()['--nexus-workbench-bg']).toBe('#f5f5f5');
+    expect(service.getThemeRuntime().getSnapshot().activeThemeId).toBe('Nexus Light');
+    expect(shell.getThemeTokens()['--nexus-workbench-background']).toBe('#f5f5f5');
+    expect(shell.getThemeTokens()['--nexus-font-family-ui']).toContain('IBM Plex Sans');
+    expect(shell.getThemeTokens()['--nexus-icon-size-md']).toBe('16px');
+    expect(shell.getThemeTokens()['--nexus-activity-bar-width']).toBe('56px');
     expect(messages).toEqual([]);
   });
 
@@ -193,7 +197,7 @@ describe('SettingsService', () => {
       type: 'string',
       scope: 'user'
     });
-    expect(shell.getThemeTokens()['--nexus-status-bar-bg']).toBe('#ffff00');
+    expect(shell.getThemeTokens()['--nexus-status-bar-background']).toBe('#ffff00');
     expect(messages).toEqual([]);
   });
 
@@ -238,8 +242,8 @@ describe('SettingsService', () => {
     expect(snapshot.schema.properties['workbench.colorTheme']).toMatchObject({
       enum: ['Nexus Dark', 'Nexus Light', 'Nexus High Contrast', 'Nexus Twilight']
     });
-    expect(shell.getThemeTokens()['--nexus-panel-bg']).toBe('#101820');
-    expect(shell.getThemeTokens()['--nexus-status-bar-bg']).toBe('#6f42c1');
+    expect(shell.getThemeTokens()['--nexus-panel-background']).toBe('#101820');
+    expect(shell.getThemeTokens()['--nexus-status-bar-background']).toBe('#6f42c1');
   });
 
   it('syncs the runtime locale from persisted and updated settings', () => {
@@ -270,5 +274,39 @@ describe('SettingsService', () => {
 
     service.updateUserSetting('workbench.locale', 'es-ES');
     expect(i18n.getLocale()).toBe('es-ES');
+  });
+
+  it('exposes a shared theme runtime that tracks persisted and updated theme selection', () => {
+    const userSettingsPath = path.join(tempDir, 'settings', 'user.json');
+    fs.mkdirSync(path.dirname(userSettingsPath), { recursive: true });
+    fs.writeFileSync(
+      userSettingsPath,
+      JSON.stringify(
+        {
+          'workbench.colorTheme': 'Nexus Light'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const service = new SettingsService({
+      shell,
+      env: { nexusHome: tempDir, defaultLocale: 'en-US' },
+      userSettingsPath,
+      i18n,
+      logger: message => messages.push(message)
+    });
+
+    service.initialize();
+    expect(service.getThemeRuntime().getSnapshot().colors['terminal.background']).toBe('#ffffff');
+    expect(service.getThemeRuntime().getSnapshot().typography['font.size.md']).toBe('13px');
+
+    service.updateUserSetting('workbench.colorTheme', 'Nexus High Contrast');
+    const snapshot = service.getThemeRuntime().getSnapshot();
+    expect(snapshot.activeThemeId).toBe('Nexus High Contrast');
+    expect(snapshot.colors['statusBar.background']).toBe('#ffff00');
+    expect(snapshot.layout['statusBar.height']).toBe('26px');
   });
 });

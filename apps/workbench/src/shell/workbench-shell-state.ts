@@ -1,22 +1,16 @@
 import { createInitialGrid } from './editor-dock-grid';
+import { createDefaultThemeCssVariables, DEFAULT_THEME_LAYOUT_TOKENS } from '@nexus/platform/theming/theme-registry';
 import type { WorkbenchLayoutState } from './workbench-shell-contract';
 
-const DEFAULT_ACTIVITY_WIDTH = 56;
-const DEFAULT_STATUS_HEIGHT = 26;
+const DEFAULT_ACTIVITY_WIDTH = Number.parseInt(DEFAULT_THEME_LAYOUT_TOKENS['activityBar.width'], 10);
+const DEFAULT_STATUS_HEIGHT = Number.parseInt(DEFAULT_THEME_LAYOUT_TOKENS['statusBar.height'], 10);
 
 export const MIN_SIDEBAR_WIDTH = 200;
 export const MAX_SIDEBAR_WIDTH = 520;
 export const MIN_PANEL_SIZE = 180;
 export const MAX_PANEL_SIZE = 520;
 
-const DEFAULT_TOKENS: Record<string, string> = Object.freeze({
-  '--nexus-workbench-bg': '#1e1e1e',
-  '--nexus-activity-bar-bg': '#252526',
-  '--nexus-sidebar-bg': '#1e1e1e',
-  '--nexus-panel-bg': '#1e1e1e',
-  '--nexus-status-bar-bg': '#007acc',
-  '--nexus-status-bar-fg': '#fff'
-});
+const DEFAULT_TOKENS: Record<string, string> = Object.freeze(createDefaultThemeCssVariables('dark'));
 
 export function createDefaultLayoutState(): WorkbenchLayoutState {
   return {

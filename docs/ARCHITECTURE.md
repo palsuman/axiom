@@ -9,7 +9,7 @@
    - Command registry + palette service supply fuzzy-searched quick open across commands/recent files, honoring keybindings + locale metadata and driving the renderer command palette UI.
 3. **Shared Packages**
    - `packages/contracts`: TypeScript interfaces for IPC, extension APIs, prompt schemas.
-   - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `workspace`, `settings`, `theming`, `windowing`, `scm`).
+  - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `workspace`, `settings`, `theming`, `windowing`, `scm`).
    - `packages/ui-kit`: reusable Angular components + theme tokens.
    - `packages/editor-adapter`: Monaco configuration, model lifecycle helpers.
    - `packages/ai-core`: llama.cpp orchestration SDK, prompt DSL, telemetry hooks.
@@ -84,6 +84,11 @@
   - `theming`
   - `windowing`
   - `workspace`
+- `packages/platform/theming` now contains:
+  - `theme-token-catalog.ts` for the canonical design-token inventory and built-in defaults
+  - `theme-registry.ts` for manifest/schema/inheritance resolution
+  - `theme-runtime.ts` for live token propagation, overrides, and consumer adapters
+- The theming subsystem now covers semantic colors plus typography, spacing, icon sizing, and layout sizing tokens, with live adoption in workbench shell CSS variables, Monaco, and the integrated terminal.
 - Root-level files in shared packages should be limited to metadata, config, and deliberate package entrypoints.
 
 ## App Organization Rules

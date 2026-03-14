@@ -1,4 +1,5 @@
 import { TerminalHost } from '../terminal/terminal-host';
+import { toTerminalThemeDefinition } from '@nexus/platform/theming/theme-runtime';
 import type { WorkbenchBootstrapContext } from './workbench-bootstrap-context';
 
 export function startWorkbenchRuntime(context: WorkbenchBootstrapContext) {
@@ -134,21 +135,19 @@ function mountTerminalSurface(
     Object.assign(container.style, {
       position: 'fixed',
       bottom: '0',
-      left: '56px',
+      left: 'var(--nexus-activity-bar-width, 56px)',
       right: '0',
       height: '240px',
-      background: context.shell.getThemeTokens()['--nexus-panel-bg'] ?? '#1e1e1e',
+      background: context.shell.getThemeTokens()['--nexus-panel-background'] ?? '#1e1e1e',
       borderTop: '1px solid rgba(255,255,255,0.1)',
       zIndex: '10'
     });
     document.body.appendChild(container);
     terminalHost = new TerminalHost({
       container,
-      theme: {
-        background: context.shell.getThemeTokens()['--nexus-panel-bg'],
-        foreground: context.shell.getThemeTokens()['--nexus-status-bar-fg']
-      }
+      theme: toTerminalThemeDefinition(context.themeRuntime.getSnapshot())
     });
+    terminalHost.bindThemeRuntime(context.themeRuntime);
     context.hotExitService.attachTerminalHost(terminalHost);
     setTerminalHost(terminalHost);
   };

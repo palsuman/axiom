@@ -1,5 +1,6 @@
 import type { MonacoApi, MonacoEditorInstance, MonacoModel } from './monaco-types';
 import { MonacoLoader, type MonacoLoaderOptions } from './monaco-loader';
+import { toMonacoThemeDefinition, type ThemeRuntime } from '@nexus/platform/theming/theme-runtime';
 
 export type EditorUri = string;
 
@@ -18,8 +19,19 @@ export interface WorkbenchThemeDefinition {
   foreground: string;
   background: string;
   selection?: string;
+  inactiveSelection?: string;
   lineHighlight?: string;
+  lineNumber?: string;
+  cursor?: string;
   comments?: string;
+  findMatchBackground?: string;
+  findMatchBorder?: string;
+  whitespace?: string;
+  indentGuide?: string;
+  activeIndentGuide?: string;
+  fontFamily?: string;
+  fontSize?: number;
+  lineHeight?: number;
 }
 
 type ModelEntry = {
@@ -35,6 +47,11 @@ type ThemeState = {
     colors: Record<string, string>;
     rules: Array<{ token: string; foreground?: string }>;
   };
+  editorOptions: {
+    fontFamily?: string;
+    fontSize?: number;
+    lineHeight?: number;
+  };
 };
 
 export class MonacoEditorService {
@@ -43,6 +60,8 @@ export class MonacoEditorService {
   private readonly models = new Map<string, ModelEntry>();
   private pendingTheme?: ThemeState;
   private activeTheme?: string;
+  private activeEditorOptions?: ThemeState['editorOptions'];
+  private disposeThemeRuntime?: () => void;
 
   constructor(options: MonacoLoaderOptions = {}, loader?: MonacoLoader) {
     this.loader = loader ?? new MonacoLoader(options);
@@ -60,7 +79,8 @@ export class MonacoEditorService {
       minimap: { enabled: false },
       automaticLayout: true,
       tabSize: init.tabSize ?? 2,
-      theme: this.activeTheme
+      theme: this.activeTheme,
+      ...(this.activeEditorOptions ?? this.pendingTheme?.editorOptions ?? {})
     });
     this.editors.add(editor);
     return editor;
@@ -86,6 +106,8 @@ export class MonacoEditorService {
   }
 
   async disposeAll() {
+    this.disposeThemeRuntime?.();
+    this.disposeThemeRuntime = undefined;
     for (const editor of Array.from(this.editors.values())) {
       await this.disposeEditor(editor);
     }
@@ -105,9 +127,15 @@ export class MonacoEditorService {
           'editor.foreground': theme.foreground,
           'editor.background': theme.background,
           'editor.selectionBackground': theme.selection ?? '#264F78',
+          'editor.inactiveSelectionBackground': theme.inactiveSelection ?? theme.selection ?? '#3a3d4166',
           'editor.lineHighlightBackground': theme.lineHighlight ?? '#2b2b2b50',
-          'editorLineNumber.foreground': theme.foreground,
-          'editorCursor.foreground': theme.foreground
+          'editorLineNumber.foreground': theme.lineNumber ?? theme.foreground,
+          'editorCursor.foreground': theme.cursor ?? theme.foreground,
+          'editor.findMatchBackground': theme.findMatchBackground ?? '#515c6a',
+          'editor.findMatchBorder': theme.findMatchBorder ?? '#ea5c0055',
+          'editorWhitespace.foreground': theme.whitespace ?? '#404040',
+          'editorIndentGuide.background': theme.indentGuide ?? '#404040',
+          'editorIndentGuide.activeBackground': theme.activeIndentGuide ?? '#707070'
         },
         rules: [
           {
@@ -115,6 +143,11 @@ export class MonacoEditorService {
             foreground: (theme.comments ?? theme.foreground).replace('#', '')
           }
         ]
+      },
+      editorOptions: {
+        fontFamily: theme.fontFamily,
+        fontSize: theme.fontSize,
+        lineHeight: theme.lineHeight
       }
     };
     if (!this.loader.isLoaded()) {
@@ -124,6 +157,22 @@ export class MonacoEditorService {
     }
     const monaco = await this.getMonaco();
     this.applyTheme(monaco, normalized);
+  }
+
+  bindThemeRuntime(themeRuntime: Pick<ThemeRuntime, 'getSnapshot' | 'onDidChange'>) {
+    this.disposeThemeRuntime?.();
+    const applySnapshot = () => {
+      const snapshot = themeRuntime.getSnapshot();
+      void this.updateWorkbenchTheme(snapshot.activeThemeId, toMonacoThemeDefinition(snapshot));
+    };
+    applySnapshot();
+    this.disposeThemeRuntime = themeRuntime.onDidChange(() => {
+      applySnapshot();
+    });
+    return () => {
+      this.disposeThemeRuntime?.();
+      this.disposeThemeRuntime = undefined;
+    };
   }
 
   private async getMonaco() {
@@ -163,5 +212,9 @@ export class MonacoEditorService {
     monaco.editor.defineTheme(theme.id, theme.definition);
     monaco.editor.setTheme(theme.id);
     this.activeTheme = theme.id;
+    this.activeEditorOptions = theme.editorOptions;
+    this.editors.forEach(editor => {
+      editor.updateOptions(theme.editorOptions);
+    });
   }
 }
