@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { NexusEnv } from '@nexus/platform/config/env';
+import type { TelemetryTrackPayload } from '@nexus/contracts/ipc';
 import { log, logError } from './logger';
 
 type StartupReport = {
@@ -12,6 +13,10 @@ type StartupReport = {
 
 const DEFAULT_BUDGET_MS = 3000;
 
+type TelemetrySink = {
+  track: (payload: TelemetryTrackPayload) => unknown;
+};
+
 export class StartupMetrics {
   private readonly startTime = performance.now();
   private readonly startedAt = new Date();
@@ -19,7 +24,11 @@ export class StartupMetrics {
   private completed = false;
   private firstWindowId: string | null = null;
 
-  constructor(private readonly env: NexusEnv, private readonly budgetMs = DEFAULT_BUDGET_MS) {
+  constructor(
+    private readonly env: NexusEnv,
+    private readonly budgetMs = DEFAULT_BUDGET_MS,
+    private readonly telemetry?: TelemetrySink
+  ) {
     this.mark('bootstrap:start');
   }
 
@@ -41,6 +50,19 @@ export class StartupMetrics {
     const status = report.totalMs <= this.budgetMs ? 'within budget' : `over budget (+${Math.round(report.totalMs - this.budgetMs)}ms)`;
     log(`[startup] total=${Math.round(report.totalMs)}ms status=${status}`);
     this.writeReport(report);
+    this.telemetry?.track({
+      name: 'desktop.startup.completed',
+      scope: 'main',
+      level: report.totalMs <= this.budgetMs ? 'info' : 'warn',
+      attributes: {
+        status: report.totalMs <= this.budgetMs ? 'within-budget' : 'over-budget',
+        firstWindowId: this.firstWindowId ?? null
+      },
+      measurements: {
+        totalMs: report.totalMs,
+        checkpointCount: Object.keys(report.checkpoints).length
+      }
+    });
   }
 
   private buildReport(): StartupReport {
@@ -70,4 +92,3 @@ export class StartupMetrics {
     }
   }
 }
-

@@ -12,6 +12,13 @@ import type {
 } from '../run-debug/launch-configuration-editor-service';
 import type { DebugSessionStore } from '../run-debug/debug-session-store';
 import type { I18nService } from '../i18n/i18n-service';
+import {
+  buildWorkbenchLiveRegionMessage,
+  createWorkbenchAccessibilityLabels,
+  getNextRovingToolbarIndex,
+  renderRovingToolbarButton,
+  type WorkbenchAccessibilityLabels
+} from './workbench-accessibility';
 
 type BootstrapModule = typeof import('../boot/bootstrap-workbench');
 const loadModule = createRequire(__filename);
@@ -22,6 +29,7 @@ type MountHandle = {
 
 type RendererElements = {
   host: HTMLElement;
+  announcer: HTMLElement;
   activityBar: HTMLElement;
   sidebar: HTMLElement;
   secondarySidebar: HTMLElement;
@@ -49,9 +57,11 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
   } = bootstrap;
 
   const render = () => {
+    const focusId = captureFocusedElementId(elements.host);
     const snapshot = shell.layoutSnapshot();
+    const labels = createWorkbenchAccessibilityLabels(i18nService);
     renderLayout(elements, snapshot);
-    renderActivityBar(elements.activityBar, snapshot, commandRegistry);
+    renderActivityBar(elements.activityBar, snapshot, commandRegistry, labels);
     renderSidebar(
       elements.sidebar,
       snapshot,
@@ -60,12 +70,23 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
       gitCommitStore,
       gitHistoryStore,
       launchConfigurationEditorService,
-      debugSessionStore
+      debugSessionStore,
+      labels
     );
-    renderSecondarySidebar(elements.secondarySidebar, snapshot);
-    renderEditors(elements.editor, snapshot, settingsEditorService, launchConfigurationEditorService, commandRegistry);
-    renderPanel(elements, snapshot);
-    renderStatusBar(elements.statusBar, snapshot, commandRegistry, i18nService);
+    renderSecondarySidebar(elements.secondarySidebar, snapshot, labels);
+    renderEditors(
+      elements.editor,
+      snapshot,
+      settingsEditorService,
+      launchConfigurationEditorService,
+      debugSessionStore,
+      commandRegistry,
+      labels
+    );
+    renderPanel(elements, snapshot, labels);
+    renderStatusBar(elements.statusBar, snapshot, commandRegistry, i18nService, labels);
+    elements.announcer.textContent = buildWorkbenchLiveRegionMessage(snapshot, i18nService);
+    restoreFocusedElement(elements.host, focusId);
   };
 
   const disposers = [
@@ -85,7 +106,8 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     commandRegistry,
     settingsEditorService,
     launchConfigurationEditorService,
-    gitStatusStore
+    gitStatusStore,
+    debugSessionStore
   );
   render();
 
@@ -103,10 +125,19 @@ function ensureWorkbenchDom(container: HTMLElement): RendererElements {
     host = document.createElement('div');
     host.id = 'nexus-workbench-app';
     host.innerHTML = `
+      <a
+        href="#nexus-editor-main"
+        class="nexus-skip-link"
+        data-action="skip-to"
+        data-focus-target="#nexus-editor-main"
+      >
+        Skip to editor
+      </a>
+      <div class="nexus-sr-only" aria-live="polite" aria-atomic="true" data-workbench-announcer="true"></div>
       <section class="nexus-surface nexus-activity-bar" data-surface="activityBar"></section>
       <section class="nexus-surface nexus-sidebar" data-surface="primarySidebar"></section>
       <section class="nexus-surface nexus-secondary-sidebar" data-surface="secondarySidebar"></section>
-      <main class="nexus-surface nexus-editor" data-surface="editor"></main>
+      <main class="nexus-surface nexus-editor" data-surface="editor" id="nexus-editor-main" tabindex="-1"></main>
       <section class="nexus-surface nexus-panel" data-surface="panel">
         <div class="nexus-panel-tabs"></div>
         <div class="nexus-panel-body"></div>
@@ -132,6 +163,7 @@ function ensureWorkbenchDom(container: HTMLElement): RendererElements {
 
   return {
     host,
+    announcer: requireElement(host, '[data-workbench-announcer="true"]'),
     activityBar: requireElement(host, '[data-surface="activityBar"]'),
     sidebar: requireElement(host, '[data-surface="primarySidebar"]'),
     secondarySidebar: requireElement(host, '[data-surface="secondarySidebar"]'),
@@ -150,7 +182,8 @@ function bindWorkbenchEvents(
   commandRegistry: CommandRegistry,
   settingsEditorService: SettingsEditorService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
-  gitStatusStore: GitStatusStore
+  gitStatusStore: GitStatusStore,
+  debugSessionStore: DebugSessionStore
 ) {
   if (host.dataset.eventsBound === 'true') {
     return;
@@ -164,6 +197,12 @@ function bindWorkbenchEvents(
     }
     const action = target.dataset.action;
     switch (action) {
+      case 'skip-to':
+        event.preventDefault();
+        if (target.dataset.focusTarget) {
+          host.querySelector<HTMLElement>(target.dataset.focusTarget)?.focus();
+        }
+        break;
       case 'activity':
         if (target.dataset.activityId) {
           shell.activateActivity(target.dataset.activityId);
@@ -271,6 +310,56 @@ function bindWorkbenchEvents(
       case 'run-debug-stop':
         void commandRegistry.executeCommand('nexus.run.debug.stop');
         break;
+      case 'run-debug-frame-select':
+        debugSessionStore.selectStackFrame(
+          target.dataset.frameId ? Number(target.dataset.frameId) : undefined
+        );
+        break;
+      case 'debug-breakpoint-add': {
+        const sourceInput = host.querySelector<HTMLInputElement>('[data-debug-breakpoint-source]');
+        const lineInput = host.querySelector<HTMLInputElement>('[data-debug-breakpoint-line]');
+        if (sourceInput?.value.trim() && lineInput?.value.trim()) {
+          debugSessionStore.addBreakpoint(sourceInput.value, Number(lineInput.value));
+          lineInput.value = '';
+        }
+        break;
+      }
+      case 'debug-breakpoint-toggle':
+        if (target.dataset.breakpointId) {
+          debugSessionStore.toggleBreakpoint(target.dataset.breakpointId);
+        }
+        break;
+      case 'debug-breakpoint-remove':
+        if (target.dataset.breakpointId) {
+          debugSessionStore.removeBreakpoint(target.dataset.breakpointId);
+        }
+        break;
+      case 'debug-breakpoint-toggle-line':
+        if (target.dataset.source && target.dataset.line) {
+          debugSessionStore.toggleBreakpointAtLocation(target.dataset.source, Number(target.dataset.line));
+        }
+        break;
+      case 'debug-watch-add': {
+        const watchInput = host.querySelector<HTMLInputElement>('[data-debug-watch-expression]');
+        if (watchInput?.value.trim()) {
+          debugSessionStore.addWatchExpression(watchInput.value);
+          watchInput.value = '';
+        }
+        break;
+      }
+      case 'debug-watch-apply':
+        if (target.dataset.watchId) {
+          const watchInput = host.querySelector<HTMLInputElement>(`[data-debug-watch-id="${target.dataset.watchId}"]`);
+          if (watchInput?.value.trim()) {
+            debugSessionStore.updateWatchExpression(target.dataset.watchId, watchInput.value);
+          }
+        }
+        break;
+      case 'debug-watch-remove':
+        if (target.dataset.watchId) {
+          debugSessionStore.removeWatchExpression(target.dataset.watchId);
+        }
+        break;
       case 'run-config-apply-json': {
         const textarea = host.querySelector<HTMLTextAreaElement>('[data-run-config-json]');
         if (textarea) {
@@ -323,6 +412,33 @@ function bindWorkbenchEvents(
       launchConfigurationEditorService.updateJsonText(target.value);
     }
   });
+
+  host.addEventListener('keydown', event => {
+    const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-roving-tab="true"]');
+    if (!target) {
+      return;
+    }
+
+    const tablist = target.closest<HTMLElement>('[data-tablist="true"]');
+    if (!tablist) {
+      return;
+    }
+
+    const items = Array.from(tablist.querySelectorAll<HTMLElement>('[data-roving-tab="true"]')).filter(
+      entry => !entry.hasAttribute('disabled')
+    );
+    const currentIndex = items.indexOf(target);
+    const orientation = tablist.dataset.tablistOrientation === 'vertical' ? 'vertical' : 'horizontal';
+    const nextIndex = getNextRovingToolbarIndex(currentIndex, event.key, items.length, orientation);
+
+    if (nextIndex === currentIndex || nextIndex < 0 || nextIndex >= items.length) {
+      return;
+    }
+
+    event.preventDefault();
+    items[nextIndex]?.focus();
+    items[nextIndex]?.click();
+  });
 }
 
 function renderLayout(elements: RendererElements, snapshot: WorkbenchSnapshot) {
@@ -337,29 +453,62 @@ function renderLayout(elements: RendererElements, snapshot: WorkbenchSnapshot) {
   applyPlacement(elements.statusBar, snapshot.placements.statusBar);
 }
 
-function renderActivityBar(activityBar: HTMLElement, snapshot: WorkbenchSnapshot, commandRegistry: CommandRegistry) {
+function renderActivityBar(
+  activityBar: HTMLElement,
+  snapshot: WorkbenchSnapshot,
+  commandRegistry: CommandRegistry,
+  labels: WorkbenchAccessibilityLabels
+) {
+  activityBar.setAttribute('aria-label', labels.activityBar);
+  const skipLink = activityBar.parentElement?.querySelector<HTMLElement>('.nexus-skip-link');
+  if (skipLink) {
+    skipLink.textContent = labels.skipToEditor;
+  }
   activityBar.innerHTML = `
-    <div class="nexus-brand">N</div>
-    <div class="nexus-activity-items">
+    <nav class="nexus-activity-nav" aria-label="${escapeHtml(labels.activityBar)}">
+    <div class="nexus-brand" aria-hidden="true">N</div>
+    <div
+      class="nexus-activity-items"
+      role="toolbar"
+      aria-label="${escapeHtml(labels.activitiesGroup)}"
+      data-tablist="true"
+      data-tablist-orientation="vertical"
+    >
       ${snapshot.activityBar.items
         .map(
-          item => `
-            <button
-              class="nexus-activity-item${snapshot.activityBar.activeId === item.id ? ' is-active' : ''}"
-              data-action="activity"
-              data-activity-id="${escapeHtml(item.id)}"
-              data-command-id="${escapeHtml(item.commandId)}"
-              title="${escapeHtml(item.title)}"
-            >
-              ${escapeHtml(item.icon ?? item.title.slice(0, 1))}
-            </button>
-          `
+          item =>
+            renderRovingToolbarButton({
+              action: 'activity',
+              active: snapshot.activityBar.activeId === item.id,
+              className: 'nexus-activity-item',
+              label: item.title,
+              focusId: `activity:${item.id}`,
+              icon: item.icon ?? item.title.slice(0, 1),
+              commandId: item.commandId,
+              data: {
+                activityId: item.id
+              },
+              hideText: true,
+              targetId: 'nexus-primary-sidebar-panel'
+            })
         )
         .join('')}
     </div>
     <div class="nexus-activity-footer">
-      <button class="nexus-activity-item" data-action="command" data-command-id="nexus.settings.open" title="Settings">S</button>
+      ${renderRovingToolbarButton({
+        action: 'command',
+        active: false,
+        className: 'nexus-activity-item',
+        label: labels.openSettings,
+        focusId: 'activity:settings',
+        icon: 'S',
+        commandId: 'nexus.settings.open',
+        hideText: true,
+        roving: false,
+        toggleable: false
+      })}
     </div>
+    </nav>
   `;
   void commandRegistry;
 }
@@ -372,30 +521,56 @@ function renderSidebar(
   gitCommitStore: GitCommitStore,
   gitHistoryStore: GitHistoryStore,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
-  debugSessionStore: DebugSessionStore
+  debugSessionStore: DebugSessionStore,
+  labels: WorkbenchAccessibilityLabels
 ) {
   const activeViewId = snapshot.sidebar.activeViewId;
+  sidebar.setAttribute('aria-label', labels.primarySidebar);
   sidebar.innerHTML = `
-    <header class="nexus-section-header">
+    <header class="nexus-section-header" id="nexus-primary-sidebar-title">
       <div class="nexus-section-title">${escapeHtml(resolveActiveSidebarTitle(snapshot))}</div>
-      <button class="nexus-ghost-button" data-action="command" data-command-id="nexus.sidebar.toggle">Hide</button>
+      <button
+        type="button"
+        class="nexus-ghost-button"
+        data-action="command"
+        data-command-id="nexus.sidebar.toggle"
+        data-focus-id="sidebar:toggle"
+        aria-label="${escapeHtml(labels.hideSidebar)}"
+      >
+        ${escapeHtml(labels.hideSidebar)}
+      </button>
     </header>
-    <div class="nexus-sidebar-tabs">
+    <div
+      class="nexus-sidebar-tabs"
+      role="toolbar"
+      aria-label="${escapeHtml(labels.sidebarViewsGroup)}"
+      data-tablist="true"
+      data-tablist-orientation="horizontal"
+    >
       ${snapshot.sidebar.views
         .map(
-          view => `
-            <button
-              class="nexus-tab-button${activeViewId === view.id ? ' is-active' : ''}"
-              data-action="sidebar-view"
-              data-view-id="${escapeHtml(view.id)}"
-            >
-              ${escapeHtml(view.title)}
-            </button>
-          `
+          view =>
+            renderRovingToolbarButton({
+              action: 'sidebar-view',
+              active: activeViewId === view.id,
+              className: 'nexus-tab-button',
+              label: view.title,
+              focusId: `sidebar:${view.id}`,
+              data: {
+                viewId: view.id
+              },
+              targetId: 'nexus-primary-sidebar-panel'
+            })
         )
         .join('')}
     </div>
-    <div class="nexus-sidebar-body">
+    <div
+      class="nexus-sidebar-body"
+      id="nexus-primary-sidebar-panel"
+      role="region"
+      aria-labelledby="nexus-primary-sidebar-title"
+      tabindex="-1"
+    >
       ${renderSidebarContent(
         activeViewId,
         gitStatusStore,
@@ -409,13 +584,24 @@ function renderSidebar(
   void commandRegistry;
 }
 
-function renderSecondarySidebar(sidebar: HTMLElement, snapshot: WorkbenchSnapshot) {
+function renderSecondarySidebar(
+  sidebar: HTMLElement,
+  snapshot: WorkbenchSnapshot,
+  labels: WorkbenchAccessibilityLabels
+) {
   const activeViewId = snapshot.secondarySidebar.activeViewId;
+  sidebar.setAttribute('aria-label', labels.secondarySidebar);
   sidebar.innerHTML = `
-    <header class="nexus-section-header">
-      <div class="nexus-section-title">Secondary Sidebar</div>
+    <header class="nexus-section-header" id="nexus-secondary-sidebar-title">
+      <div class="nexus-section-title">${escapeHtml(labels.secondarySidebar)}</div>
     </header>
-    <div class="nexus-sidebar-body">
+    <div
+      class="nexus-sidebar-body"
+      id="nexus-secondary-sidebar-panel"
+      role="region"
+      aria-labelledby="nexus-secondary-sidebar-title"
+      tabindex="-1"
+    >
       ${
         activeViewId
           ? `<p class="nexus-muted">No secondary content registered for ${escapeHtml(activeViewId)}.</p>`
@@ -430,37 +616,54 @@ function renderEditors(
   snapshot: WorkbenchSnapshot,
   settingsEditorService: SettingsEditorService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
-  commandRegistry: CommandRegistry
+  debugSessionStore: DebugSessionStore,
+  commandRegistry: CommandRegistry,
+  labels: WorkbenchAccessibilityLabels
 ) {
   const activeGroupId = snapshot.editors.activeGroupId;
+  editor.setAttribute('aria-label', labels.editor);
   editor.innerHTML = `
-    <div class="nexus-editor-groups">
+    <div class="nexus-editor-groups" aria-label="${escapeHtml(labels.editorTabsGroup)}">
       ${snapshot.editors.groups
         .map(group => {
           const activeTab = group.tabs.find(tab => tab.id === group.activeTabId) ?? group.tabs[0];
+          const panelId = `nexus-editor-panel-${escapeHtml(group.id)}`;
           return `
-            <section class="nexus-editor-group${group.id === activeGroupId ? ' is-active' : ''}">
-              <div class="nexus-editor-tabs">
+            <section
+              class="nexus-editor-group${group.id === activeGroupId ? ' is-active' : ''}"
+              aria-label="${escapeHtml(group.id === activeGroupId ? 'Active editor group' : 'Editor group')}"
+            >
+              <div
+                class="nexus-editor-tabs"
+                role="toolbar"
+                aria-label="${escapeHtml(labels.editorTabsGroup)}"
+                data-tablist="true"
+                data-tablist-orientation="horizontal"
+              >
                 ${group.tabs
                   .map(
-                    tab => `
-                      <button
-                        class="nexus-editor-tab${tab.id === group.activeTabId ? ' is-active' : ''}"
-                        data-action="editor-tab"
-                        data-resource="${escapeHtml(tab.resource)}"
-                      >
-                        ${escapeHtml(tab.title)}
-                      </button>
-                    `
+                    tab =>
+                      renderRovingToolbarButton({
+                        action: 'editor-tab',
+                        active: tab.id === group.activeTabId,
+                        className: 'nexus-editor-tab',
+                        label: tab.title,
+                        focusId: `editor:${tab.resource}`,
+                        data: {
+                          resource: tab.resource
+                        },
+                        targetId: panelId
+                      })
                   )
                   .join('')}
               </div>
-              <div class="nexus-editor-content">
+              <div class="nexus-editor-content" id="${panelId}" role="region" tabindex="-1">
                 ${renderEditorContent(
                   activeTab?.resource,
                   activeTab?.title,
                   settingsEditorService,
-                  launchConfigurationEditorService
+                  launchConfigurationEditorService,
+                  debugSessionStore
                 )}
               </div>
             </section>
@@ -472,21 +675,34 @@ function renderEditors(
   void commandRegistry;
 }
 
-function renderPanel(elements: RendererElements, snapshot: WorkbenchSnapshot) {
+function renderPanel(elements: RendererElements, snapshot: WorkbenchSnapshot, labels: WorkbenchAccessibilityLabels) {
   const activeViewId = snapshot.panel.activeViewId ?? 'panel.output';
+  const activeViewTitle = snapshot.panel.views.find(view => view.id === activeViewId)?.title ?? 'Panel';
+  elements.panel.setAttribute('aria-label', labels.panel);
   elements.panelTabs.innerHTML = snapshot.panel.views
     .map(
-      view => `
-        <button
-          class="nexus-tab-button${activeViewId === view.id ? ' is-active' : ''}"
-          data-action="panel-view"
-          data-view-id="${escapeHtml(view.id)}"
-        >
-          ${escapeHtml(view.title)}
-        </button>
-      `
+      view =>
+        renderRovingToolbarButton({
+          action: 'panel-view',
+          active: activeViewId === view.id,
+          className: 'nexus-tab-button',
+          label: view.title,
+          focusId: `panel:${view.id}`,
+          data: {
+            viewId: view.id
+          },
+          targetId: 'nexus-panel-body'
+        })
     )
     .join('');
+  elements.panelTabs.setAttribute('role', 'toolbar');
+  elements.panelTabs.setAttribute('aria-label', labels.panelViewsGroup);
+  elements.panelTabs.dataset.tablist = 'true';
+  elements.panelTabs.dataset.tablistOrientation = 'horizontal';
+  elements.panelBody.id = 'nexus-panel-body';
+  elements.panelBody.setAttribute('role', 'region');
+  elements.panelBody.setAttribute('tabindex', '-1');
+  elements.panelBody.setAttribute('aria-label', activeViewTitle);
 
   if (activeViewId === 'panel.terminal') {
     elements.panelBody.innerHTML = `
@@ -510,10 +726,12 @@ function renderStatusBar(
   statusBar: HTMLElement,
   snapshot: WorkbenchSnapshot,
   commandRegistry: CommandRegistry,
-  i18nService: I18nService
+  i18nService: I18nService,
+  labels: WorkbenchAccessibilityLabels
 ) {
   const left = snapshot.statusBar.items.filter(item => item.alignment === 'left' && item.visible !== false);
   const right = snapshot.statusBar.items.filter(item => item.alignment === 'right' && item.visible !== false);
+  statusBar.setAttribute('aria-label', labels.statusBar);
   statusBar.innerHTML = `
     <div class="nexus-status-segment">
       ${left.map(item => renderStatusItem(item, i18nService)).join('')}
@@ -634,7 +852,8 @@ function renderEditorContent(
   resource: string | undefined,
   title: string | undefined,
   settingsEditorService: SettingsEditorService,
-  launchConfigurationEditorService: LaunchConfigurationEditorService
+  launchConfigurationEditorService: LaunchConfigurationEditorService,
+  debugSessionStore: DebugSessionStore
 ) {
   if (!resource) {
     return '<div class="nexus-empty">No editor open.</div>';
@@ -658,11 +877,60 @@ function renderEditorContent(
   if (resource.startsWith('run-config://')) {
     return renderLaunchConfigurationEditor(launchConfigurationEditorService);
   }
+  const debugSnapshot = debugSessionStore.getSnapshot();
+  const resourceBreakpoints = debugSnapshot.breakpoints.filter(breakpoint => breakpoint.source === resource);
   return `
-    <div class="nexus-file-view">
+    <div class="nexus-file-view nexus-debuggable-file-view">
       <div class="nexus-file-badge">${escapeHtml(title ?? 'File')}</div>
       <h2>${escapeHtml(resource)}</h2>
-      <p class="nexus-muted">Editor layout, tabs, commands, settings, theming, Git, and terminal runtime are active. Monaco DOM mounting is the next renderer step.</p>
+      <p class="nexus-muted">The editor host is still a shell renderer, so breakpoint controls are surfaced through a synthetic gutter until Monaco lands.</p>
+      <div class="nexus-debug-editor-grid">
+        <div class="nexus-debug-gutter" aria-label="Breakpoint gutter">
+          ${renderBreakpointGutter(resource, resourceBreakpoints)}
+        </div>
+        <div class="nexus-debug-editor-placeholder">
+          <p class="nexus-muted">Editor layout, tabs, commands, settings, theming, Git, and terminal runtime are active. Monaco DOM mounting is the next renderer step.</p>
+          ${
+            resourceBreakpoints.length
+              ? `
+                <div class="nexus-card">
+                  <h3>Breakpoints in this file</h3>
+                  <div class="nexus-list">
+                    ${resourceBreakpoints
+                      .map(
+                        breakpoint => `
+                          <div class="nexus-list-item">
+                            <div class="nexus-list-item-meta">
+                              <strong>Line ${breakpoint.line}</strong>
+                              <div class="nexus-muted">${breakpoint.enabled ? 'Enabled' : 'Disabled'}</div>
+                            </div>
+                            <div class="nexus-inline-actions">
+                              <button
+                                class="nexus-ghost-button"
+                                data-action="debug-breakpoint-toggle"
+                                data-breakpoint-id="${escapeHtml(breakpoint.id)}"
+                              >
+                                ${breakpoint.enabled ? 'Disable' : 'Enable'}
+                              </button>
+                              <button
+                                class="nexus-ghost-button"
+                                data-action="debug-breakpoint-remove"
+                                data-breakpoint-id="${escapeHtml(breakpoint.id)}"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        `
+                      )
+                      .join('')}
+                  </div>
+                </div>
+              `
+              : '<p class="nexus-muted">No persisted breakpoints for this file yet.</p>'
+          }
+        </div>
+      </div>
     </div>
   `;
 }
@@ -675,6 +943,8 @@ function renderRunDebugSidebar(
   const debugSnapshot = debugSessionStore.getSnapshot();
   const session = debugSnapshot.session;
   const stateLabel = session?.state ?? 'idle';
+  const selectedFrame = session?.stackFrames.find(frame => frame.id === debugSnapshot.selectedStackFrameId);
+  const defaultBreakpointSource = resolveDefaultBreakpointSource(debugSnapshot);
   return `
     <div class="nexus-card-stack">
       <div class="nexus-card">
@@ -695,12 +965,17 @@ function renderRunDebugSidebar(
                 ${session.stackFrames
                   .map(
                     frame => `
-                      <div class="nexus-list-item">
+                      <button
+                        class="nexus-list-item nexus-list-item-button${debugSnapshot.selectedStackFrameId === frame.id ? ' is-selected' : ''}"
+                        data-action="run-debug-frame-select"
+                        data-frame-id="${frame.id}"
+                      >
                         <div class="nexus-list-item-meta">
                           <strong>${escapeHtml(frame.name)}</strong>
                           <div class="nexus-muted">${escapeHtml(frame.source?.path ?? 'unknown')}:${frame.line}:${frame.column}</div>
                         </div>
-                      </div>
+                        <span class="nexus-muted">${debugSnapshot.selectedStackFrameId === frame.id ? 'Selected' : 'Frame'}</span>
+                      </button>
                     `
                   )
                   .join('')}
@@ -709,9 +984,161 @@ function renderRunDebugSidebar(
             : '<p class="nexus-muted">No stack frames yet. Start a session to capture call stacks.</p>'
         }
         ${
+          selectedFrame
+            ? `
+              <div class="nexus-debug-details">
+                <strong>Selected Frame</strong>
+                <div class="nexus-muted">${escapeHtml(selectedFrame.name)} · ${escapeHtml(selectedFrame.source?.path ?? 'unknown')}</div>
+                <div class="nexus-code">line ${selectedFrame.line}, column ${selectedFrame.column}</div>
+              </div>
+            `
+            : ''
+        }
+        ${
           debugSnapshot.error
             ? `<p class="nexus-error">${escapeHtml(debugSnapshot.error)}</p>`
             : ''
+        }
+      </div>
+      <div class="nexus-card">
+        <div class="nexus-split">
+          <div>
+            <h3>Breakpoints</h3>
+            <p class="nexus-muted">Persisted per workspace and injected into every new debug session.</p>
+          </div>
+          <span class="nexus-file-badge">${debugSnapshot.breakpoints.length} total</span>
+        </div>
+        <div class="nexus-debug-form-grid">
+          <label class="nexus-run-config-field">
+            <span>Source</span>
+            <input
+              class="nexus-input nexus-code"
+              data-debug-breakpoint-source="true"
+              value="${escapeHtml(defaultBreakpointSource)}"
+              placeholder="/workspace/server.js"
+            />
+          </label>
+          <label class="nexus-run-config-field">
+            <span>Line</span>
+            <input
+              class="nexus-input nexus-code"
+              type="number"
+              min="1"
+              step="1"
+              data-debug-breakpoint-line="true"
+              value="1"
+            />
+          </label>
+        </div>
+        <div class="nexus-inline-actions">
+          <button class="nexus-primary-button" data-action="debug-breakpoint-add">Add Breakpoint</button>
+        </div>
+        ${
+          debugSnapshot.breakpoints.length
+            ? `
+              <div class="nexus-list">
+                ${debugSnapshot.breakpoints
+                  .slice()
+                  .sort((left, right) =>
+                    left.source === right.source ? left.line - right.line : left.source.localeCompare(right.source)
+                  )
+                  .map(
+                    breakpoint => `
+                      <div class="nexus-list-item">
+                        <div class="nexus-list-item-meta">
+                          <strong>${escapeHtml(breakpoint.source)}</strong>
+                          <div class="nexus-muted">Line ${breakpoint.line}</div>
+                        </div>
+                        <div class="nexus-inline-actions">
+                          <button
+                            class="nexus-ghost-button"
+                            data-action="debug-breakpoint-toggle"
+                            data-breakpoint-id="${escapeHtml(breakpoint.id)}"
+                          >
+                            ${breakpoint.enabled ? 'Disable' : 'Enable'}
+                          </button>
+                          <button
+                            class="nexus-ghost-button"
+                            data-action="debug-breakpoint-remove"
+                            data-breakpoint-id="${escapeHtml(breakpoint.id)}"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    `
+                  )
+                  .join('')}
+              </div>
+            `
+            : '<p class="nexus-muted">No persisted breakpoints yet.</p>'
+        }
+      </div>
+      <div class="nexus-card">
+        <div class="nexus-split">
+          <div>
+            <h3>Watch Expressions</h3>
+            <p class="nexus-muted">Expressions persist per workspace and refresh whenever execution stops.</p>
+          </div>
+          <span class="nexus-file-badge">${debugSnapshot.watchExpressions.length} watches</span>
+        </div>
+        <div class="nexus-inline-actions">
+          <input
+            class="nexus-input nexus-code"
+            data-debug-watch-expression="true"
+            placeholder="process.pid"
+          />
+          <button class="nexus-primary-button" data-action="debug-watch-add">Add Watch</button>
+        </div>
+        ${
+          debugSnapshot.watchExpressions.length
+            ? `
+              <div class="nexus-list">
+                ${debugSnapshot.watchExpressions
+                  .map(
+                    watch => `
+                      <div class="nexus-list-item nexus-debug-watch-item">
+                        <div class="nexus-list-item-meta">
+                          <input
+                            class="nexus-input nexus-code"
+                            data-debug-watch-id="${escapeHtml(watch.id)}"
+                            value="${escapeHtml(watch.expression)}"
+                          />
+                          <div class="nexus-muted">
+                            ${
+                              watch.status === 'evaluating'
+                                ? 'Evaluating…'
+                                : watch.status === 'error'
+                                  ? escapeHtml(watch.error ?? 'Evaluation failed')
+                                  : watch.status === 'evaluated'
+                                    ? `${escapeHtml(watch.value ?? '')}${watch.type ? ` (${escapeHtml(watch.type)})` : ''}`
+                                    : 'Waiting for a stopped frame'
+                            }
+                          </div>
+                        </div>
+                        <div class="nexus-inline-actions">
+                          <button
+                            class="nexus-ghost-button"
+                            data-action="debug-watch-apply"
+                            data-watch-id="${escapeHtml(watch.id)}"
+                          >
+                            Apply
+                          </button>
+                          <button
+                            class="nexus-ghost-button"
+                            data-action="debug-watch-remove"
+                            data-watch-id="${escapeHtml(watch.id)}"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    `
+                  )
+                  .join('')}
+              </div>
+            `
+            : '<p class="nexus-muted">No watch expressions yet.</p>'
         }
       </div>
       <div class="nexus-card">
@@ -775,6 +1202,33 @@ function renderRunDebugSidebar(
       ${renderLaunchConfigurationIssues(snapshot.issues)}
     </div>
   `;
+}
+
+function renderBreakpointGutter(resource: string, breakpoints: Array<{ id: string; line: number; enabled: boolean }>) {
+  const totalLines = Math.max(12, ...breakpoints.map(entry => entry.line));
+  const lines = Array.from({ length: totalLines }, (_value, index) => index + 1);
+  return lines
+    .map(line => {
+      const breakpoint = breakpoints.find(entry => entry.line === line);
+      return `
+        <button
+          class="nexus-debug-gutter-line${breakpoint?.enabled ? ' is-active' : ''}"
+          data-action="debug-breakpoint-toggle-line"
+          data-source="${escapeHtml(resource)}"
+          data-line="${line}"
+          aria-label="${breakpoint?.enabled ? `Disable breakpoint on line ${line}` : `Enable breakpoint on line ${line}`}"
+        >
+          <span class="nexus-debug-gutter-line-number">${line}</span>
+          <span class="nexus-debug-breakpoint-dot" aria-hidden="true"></span>
+        </button>
+      `;
+    })
+    .join('');
+}
+
+function resolveDefaultBreakpointSource(debugSnapshot: ReturnType<DebugSessionStore['getSnapshot']>) {
+  const selectedFrame = debugSnapshot.session?.stackFrames.find(frame => frame.id === debugSnapshot.selectedStackFrameId);
+  return selectedFrame?.source?.path ?? debugSnapshot.breakpoints[0]?.source ?? '';
 }
 
 function renderLaunchConfigurationEditor(launchConfigurationEditorService: LaunchConfigurationEditorService) {
@@ -1226,18 +1680,32 @@ function renderSettingsJson(
 function renderStatusItem(item: WorkbenchSnapshot['statusBar']['items'][number], i18nService: I18nService) {
   const text = resolveStatusText(item.text, i18nService);
   const tooltip = item.tooltip ? resolveStatusText(item.tooltip, i18nService) : text;
+  const ariaLabel = item.ariaLabel ? resolveStatusText(item.ariaLabel, i18nService) : tooltip;
   const content = `
     <span class="nexus-status-label">${escapeHtml(text)}</span>
     ${
       item.progress
-        ? `<progress max="${item.progress.total ?? 100}" value="${item.progress.value}" class="nexus-progress"></progress>`
+        ? `<progress
+            max="${item.progress.total ?? 100}"
+            value="${item.progress.value}"
+            class="nexus-progress"
+            aria-label="${escapeHtml(`${ariaLabel} progress`)}"
+          ></progress>`
         : ''
     }
   `;
   if (item.commandId) {
-    return `<button class="nexus-status-item" title="${escapeHtml(tooltip)}" data-action="command" data-command-id="${escapeHtml(item.commandId)}">${content}</button>`;
+    return `<button
+      type="button"
+      class="nexus-status-item"
+      title="${escapeHtml(tooltip)}"
+      aria-label="${escapeHtml(ariaLabel)}"
+      data-action="command"
+      data-command-id="${escapeHtml(item.commandId)}"
+      data-focus-id="status:${escapeHtml(item.id)}"
+    >${content}</button>`;
   }
-  return `<div class="nexus-status-item" title="${escapeHtml(tooltip)}">${content}</div>`;
+  return `<div class="nexus-status-item" title="${escapeHtml(tooltip)}" aria-label="${escapeHtml(ariaLabel)}">${content}</div>`;
 }
 
 function resolveStatusText(
@@ -1250,6 +1718,24 @@ function resolveStatusText(
 function resolveActiveSidebarTitle(snapshot: WorkbenchSnapshot) {
   const active = snapshot.sidebar.views.find(view => view.id === snapshot.sidebar.activeViewId);
   return active?.title ?? 'Sidebar';
+}
+
+function captureFocusedElementId(host: HTMLElement) {
+  const activeElement = document.activeElement as HTMLElement | null;
+  if (!activeElement || !host.contains(activeElement)) {
+    return undefined;
+  }
+  return activeElement.dataset.focusId;
+}
+
+function restoreFocusedElement(host: HTMLElement, focusId?: string) {
+  if (!focusId) {
+    return;
+  }
+  const nextTarget = Array.from(host.querySelectorAll<HTMLElement>('[data-focus-id]')).find(
+    entry => entry.dataset.focusId === focusId
+  );
+  nextTarget?.focus();
 }
 
 function applyPlacement(element: HTMLElement, placement: WorkbenchSnapshot['placements'][keyof WorkbenchSnapshot['placements']]) {
@@ -1311,6 +1797,33 @@ function injectWorkbenchStyles() {
         radial-gradient(circle at top right, color-mix(in srgb, var(--nexus-panel-background, #202020) 85%, transparent), transparent 40%),
         var(--nexus-workbench-background, #181818);
     }
+    .nexus-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .nexus-skip-link {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 20;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--nexus-button-background, #2d6cdf);
+      color: var(--nexus-button-foreground, #fff);
+      text-decoration: none;
+      transform: translateY(-140%);
+      transition: transform 120ms ease;
+    }
+    .nexus-skip-link:focus {
+      transform: translateY(0);
+    }
     .nexus-surface {
       min-width: 0;
       min-height: 0;
@@ -1325,6 +1838,14 @@ function injectWorkbenchStyles() {
       padding: 12px 8px;
       background: var(--nexus-activity-bar-background, #111111);
       border-right: 1px solid var(--nexus-border, rgba(255,255,255,0.08));
+    }
+    .nexus-activity-nav {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      height: 100%;
     }
     .nexus-brand {
       width: 36px;
@@ -1363,6 +1884,20 @@ function injectWorkbenchStyles() {
     .nexus-activity-item.is-active {
       background: color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 20%, transparent);
       color: var(--nexus-foreground, #fff);
+    }
+    .nexus-activity-item:focus-visible,
+    .nexus-tab-button:focus-visible,
+    .nexus-ghost-button:focus-visible,
+    .nexus-primary-button:focus-visible,
+    .nexus-editor-tab:focus-visible,
+    .nexus-status-item:focus-visible,
+    .nexus-list-item-button:focus-visible,
+    .nexus-input:focus-visible,
+    .nexus-select:focus-visible,
+    .nexus-search-input:focus-visible,
+    .nexus-textarea:focus-visible {
+      outline: 2px solid var(--nexus-button-background, #2d6cdf);
+      outline-offset: 2px;
     }
     .nexus-sidebar,
     .nexus-secondary-sidebar,
@@ -1494,6 +2029,66 @@ function injectWorkbenchStyles() {
     .nexus-run-config-grid {
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
+    .nexus-debug-form-grid,
+    .nexus-debug-editor-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .nexus-debug-form-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin: 12px 0;
+    }
+    .nexus-debug-editor-grid {
+      grid-template-columns: minmax(92px, 112px) 1fr;
+      align-items: start;
+      margin-top: 14px;
+    }
+    .nexus-debug-gutter,
+    .nexus-debug-editor-placeholder,
+    .nexus-debug-details {
+      display: grid;
+      gap: 10px;
+    }
+    .nexus-debug-gutter {
+      padding: 10px;
+      border-radius: 14px;
+      background: var(--nexus-input-background, rgba(0,0,0,0.22));
+    }
+    .nexus-debug-gutter-line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .nexus-debug-gutter-line.is-active {
+      background: color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 16%, transparent);
+    }
+    .nexus-debug-gutter-line-number {
+      font: 12px/1 var(--nexus-font-mono);
+      opacity: 0.72;
+    }
+    .nexus-debug-breakpoint-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 55%, transparent);
+      background: transparent;
+    }
+    .nexus-debug-gutter-line.is-active .nexus-debug-breakpoint-dot {
+      background: var(--nexus-button-background, #2d6cdf);
+      border-color: var(--nexus-button-background, #2d6cdf);
+    }
+    .nexus-debug-watch-item {
+      align-items: flex-start;
+    }
     .nexus-run-config-grid-wide {
       margin-top: 12px;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1511,6 +2106,10 @@ function injectWorkbenchStyles() {
       width: 100%;
       color: inherit;
       text-align: left;
+    }
+    .nexus-list-item-button.is-selected {
+      background: color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 18%, transparent);
+      border: 1px solid color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 45%, transparent);
     }
     .nexus-primary-button,
     .nexus-ghost-button {
@@ -1598,6 +2197,9 @@ function injectWorkbenchStyles() {
         grid-template-columns: 1fr;
       }
       .nexus-editor-groups {
+        grid-template-columns: 1fr;
+      }
+      .nexus-debug-editor-grid {
         grid-template-columns: 1fr;
       }
     }

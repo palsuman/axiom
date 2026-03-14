@@ -24,6 +24,13 @@ class FakeDebugAdapterClient extends EventEmitter {
     this.responses.set('configurationDone', okResponse('configurationDone'));
     this.responses.set('setBreakpoints', okResponse('setBreakpoints', { breakpoints: [{ verified: true, line: 12 }] }));
     this.responses.set('disconnect', okResponse('disconnect'));
+    this.responses.set(
+      'evaluate',
+      okResponse('evaluate', {
+        result: '12345',
+        type: 'number'
+      })
+    );
     this.responses.set('threads', okResponse('threads', { threads: [{ id: 1, name: 'Main Thread' }] }));
     this.responses.set(
       'stackTrace',
@@ -200,6 +207,34 @@ describe('DebugAdapterHostService', () => {
     });
 
     await expect(host.start({ id: 1 } as never, {})).rejects.toThrow(/Launch configuration validation failed/);
+  });
+
+  it('evaluates expressions against the active debug session', async () => {
+    const host = new DebugAdapterHostService(windows as never, launchConfigurations as never, {
+      adapterResolver: () => ({ command: 'fake-adapter' }),
+      clientFactory: () => {
+        const client = new FakeDebugAdapterClient();
+        clients.push(client);
+        return client as never;
+      }
+    });
+
+    const started = await host.start({ id: 11 } as never, {});
+    const result = await host.evaluate({ id: 11 } as never, {
+      sessionId: started.sessionId,
+      frameId: 1,
+      expression: 'process.pid',
+      context: 'watch'
+    });
+
+    expect(result).toEqual({
+      sessionId: started.sessionId,
+      frameId: 1,
+      expression: 'process.pid',
+      result: '12345',
+      type: 'number'
+    });
+    expect(clients[0]?.requests.some(request => request.command === 'evaluate')).toBe(true);
   });
 });
 

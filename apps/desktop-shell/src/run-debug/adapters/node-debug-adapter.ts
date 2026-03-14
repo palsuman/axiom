@@ -111,6 +111,12 @@ async function handleRequest(request: DebugProtocolRequest) {
       });
       return;
 
+    case 'evaluate': {
+      const args = (request.arguments ?? {}) as Record<string, unknown>;
+      sendResponse(request, evaluateExpression(args));
+      return;
+    }
+
     case 'continue':
       runtime.lastStop = undefined;
       sendResponse(request, { allThreadsContinued: true });
@@ -247,6 +253,63 @@ function buildStackFrames() {
       column: 1
     }
   ];
+}
+
+function evaluateExpression(args: Record<string, unknown>) {
+  const expression = readOptionalString(args, 'expression') ?? '';
+  const normalized = expression.trim();
+  if (!normalized) {
+    return {
+      result: 'Expression is empty',
+      type: 'string'
+    };
+  }
+
+  switch (normalized) {
+    case 'process.pid':
+      return {
+        result: runtime.target?.pid ? String(runtime.target.pid) : '0',
+        type: 'number'
+      };
+    case 'process.cwd()':
+    case 'cwd':
+      return {
+        result: runtime.targetCwd ?? process.cwd(),
+        type: 'string'
+      };
+    case 'program':
+      return {
+        result: runtime.targetProgram ?? '',
+        type: 'string'
+      };
+    case 'stopReason':
+      return {
+        result: runtime.lastStop?.reason ?? 'running',
+        type: 'string'
+      };
+    case 'args.length':
+      return {
+        result: String(process.argv.length),
+        type: 'number'
+      };
+    default:
+      if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+        return {
+          result: normalized,
+          type: 'number'
+        };
+      }
+      if ((normalized.startsWith('"') && normalized.endsWith('"')) || (normalized.startsWith("'") && normalized.endsWith("'"))) {
+        return {
+          result: normalized.slice(1, -1),
+          type: 'string'
+        };
+      }
+      return {
+        result: `Unavailable in Nexus MVP adapter: ${normalized}`,
+        type: 'string'
+      };
+  }
 }
 
 function readSourcePath(args: Record<string, unknown>) {

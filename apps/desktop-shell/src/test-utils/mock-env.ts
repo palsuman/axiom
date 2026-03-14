@@ -16,7 +16,13 @@ export function createMockEnv(overrides: Partial<NexusEnv> = {}): NexusEnv {
     workspaceDataDir: workspaceDir,
     updateChannel: 'stable',
     updateFeedUrl: undefined,
-    autoUpdateEnabled: false
+    autoUpdateEnabled: false,
+    crashReportingEnabled: false,
+    crashReportingUrl: undefined,
+    crashReportingTimeoutMs: 5000,
+    featureFlagsFile: path.join(dataDir, 'config', 'feature-flags.json'),
+    featureFlagsUrl: undefined,
+    featureFlags: undefined
   };
   return { ...base, ...overrides };
 }

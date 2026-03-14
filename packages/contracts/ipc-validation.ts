@@ -3,6 +3,7 @@ import type {
   CreateEntryPayload,
   DebugSessionStartPayload,
   DebugSessionStopPayload,
+  DebugEvaluatePayload,
   DeleteEntriesPayload,
   FsEntryKind,
   GitCommitPayload,
@@ -18,6 +19,8 @@ import type {
   TerminalCreatePayload,
   TerminalDisposePayload,
   TerminalResizePayload,
+  TelemetryReplayRequest,
+  TelemetryTrackPayload,
   TerminalWritePayload,
   UndoPayload,
   WorkspaceBackupContent,
@@ -53,12 +56,39 @@ const GIT_STATUS_VALUES = new Set([
   'merged'
 ]);
 
+const TELEMETRY_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
+const TELEMETRY_SCOPES = ['main', 'renderer', 'preload', 'shared'] as const;
+
 const payloadValidators = {
   'nexus:log': (payload: unknown): LogPayload => {
     const value = asObject(payload, 'payload');
     return {
       level: readEnum(value, 'level', ['error', 'warn', 'info', 'debug']),
       message: readString(value, 'message', { minLength: 1 })
+    };
+  },
+  'nexus:telemetry:track': (payload: unknown): TelemetryTrackPayload => {
+    const value = asObject(payload, 'payload');
+    return {
+      name: readString(value, 'name', { minLength: 1 }),
+      scope: readEnum(value, 'scope', TELEMETRY_SCOPES),
+      level: readEnum(value, 'level', TELEMETRY_LEVELS, { optional: true }),
+      message: readString(value, 'message', { optional: true, allowEmpty: false }),
+      attributes: readTelemetryAttributeRecord(value, 'attributes', { optional: true }),
+      measurements: readNumberRecord(value, 'measurements', { optional: true, min: 0 }),
+      tags: readStringArray(value, 'tags', { optional: true }),
+      timestamp: readInteger(value, 'timestamp', { optional: true, min: 0 }),
+      sessionId: readString(value, 'sessionId', { optional: true, allowEmpty: false }),
+      workspaceId: readString(value, 'workspaceId', { optional: true, allowEmpty: false })
+    };
+  },
+  'nexus:telemetry:replay': (payload: unknown): TelemetryReplayRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      limit: readInteger(value, 'limit', { optional: true, min: 1, max: 500 }),
+      scope: readEnum(value, 'scope', TELEMETRY_SCOPES, { optional: true }),
+      level: readEnum(value, 'level', TELEMETRY_LEVELS, { optional: true }),
+      name: readString(value, 'name', { optional: true, allowEmpty: false })
     };
   },
   'nexus:open-workspace': (payload: unknown): OpenWorkspacePayload => {
@@ -218,6 +248,15 @@ const payloadValidators = {
     return {
       sessionId: readString(value, 'sessionId', { optional: true, allowEmpty: false }),
       terminateDebuggee: readBoolean(value, 'terminateDebuggee', { optional: true })
+    };
+  },
+  'nexus:debug:evaluate': (payload: unknown): DebugEvaluatePayload => {
+    const value = asObject(payload, 'payload');
+    return {
+      sessionId: readString(value, 'sessionId', { optional: true, allowEmpty: false }),
+      frameId: readInteger(value, 'frameId', { optional: true, min: 1 }),
+      expression: readString(value, 'expression', { minLength: 1, allowEmpty: false }),
+      context: readEnum(value, 'context', ['watch', 'repl', 'hover'] as const, { optional: true })
     };
   },
   'nexus:workspace-backup:save': (payload: unknown): WorkspaceBackupSavePayload => {
@@ -468,10 +507,44 @@ function readInteger(
   return raw;
 }
 
-function readEnum<T extends string>(value: Record<string, unknown>, key: string, allowed: readonly T[]) {
-  const raw = readString(value, key, { minLength: 1 }) as T;
+function readEnum<T extends string>(
+  value: Record<string, unknown>,
+  key: string,
+  allowed: readonly T[],
+  options?: { optional?: false; label?: string }
+): T;
+function readEnum<T extends string>(
+  value: Record<string, unknown>,
+  key: string,
+  allowed: readonly T[],
+  options: { optional: true; label?: string }
+): T | undefined;
+function readEnum<T extends string>(
+  value: Record<string, unknown>,
+  key: string,
+  allowed: readonly T[],
+  options: { optional?: boolean; label?: string } = {}
+) {
+  const label = options.label ?? key;
+  const rawValue = value[key];
+  if (rawValue === undefined || rawValue === null) {
+    if (options.optional) {
+      return undefined;
+    }
+    throw new IpcValidationError(label, [`${label} is required`]);
+  }
+  if (typeof rawValue !== 'string') {
+    throw new IpcValidationError(label, [`${label} must be a string`]);
+  }
+  const raw = rawValue.trim() as T;
+  if (!raw) {
+    throw new IpcValidationError(label, [`${label} must not be empty`]);
+  }
+  if (raw === undefined) {
+    return undefined;
+  }
   if (!allowed.includes(raw)) {
-    throw new IpcValidationError(key, [`${key} must be one of ${allowed.join(', ')}`]);
+    throw new IpcValidationError(label, [`${label} must be one of ${allowed.join(', ')}`]);
   }
   return raw;
 }
@@ -607,6 +680,90 @@ function readStringRecord(
   Object.entries(record).forEach(([recordKey, recordValue]) => {
     if (typeof recordValue !== 'string') {
       throw new IpcValidationError(label, [`${label}.${recordKey} must be a string`]);
+    }
+    normalized[recordKey] = recordValue;
+  });
+  return normalized;
+}
+
+function readNumberRecord(
+  value: Record<string, unknown>,
+  key: string,
+  options?: { optional?: false; min?: number; max?: number; label?: string }
+): Record<string, number>;
+function readNumberRecord(
+  value: Record<string, unknown>,
+  key: string,
+  options: { optional: true; min?: number; max?: number; label?: string }
+): Record<string, number> | undefined;
+function readNumberRecord(
+  value: Record<string, unknown>,
+  key: string,
+  options: { optional?: boolean; min?: number; max?: number; label?: string } = {}
+) {
+  const label = options.label ?? key;
+  const raw = value[key];
+  if (raw === undefined || raw === null) {
+    if (options.optional) {
+      return undefined;
+    }
+    throw new IpcValidationError(label, [`${label} is required`]);
+  }
+  const record = asObject(raw, label);
+  const normalized: Record<string, number> = {};
+  Object.entries(record).forEach(([recordKey, recordValue]) => {
+    if (typeof recordValue !== 'number' || !Number.isFinite(recordValue)) {
+      throw new IpcValidationError(label, [`${label}.${recordKey} must be a finite number`]);
+    }
+    if (options.min !== undefined && recordValue < options.min) {
+      throw new IpcValidationError(label, [`${label}.${recordKey} must be >= ${options.min}`]);
+    }
+    if (options.max !== undefined && recordValue > options.max) {
+      throw new IpcValidationError(label, [`${label}.${recordKey} must be <= ${options.max}`]);
+    }
+    normalized[recordKey] = recordValue;
+  });
+  return normalized;
+}
+
+function readTelemetryAttributeRecord(
+  value: Record<string, unknown>,
+  key: string,
+  options?: { optional?: false; label?: string }
+): Record<string, string | number | boolean | null>;
+function readTelemetryAttributeRecord(
+  value: Record<string, unknown>,
+  key: string,
+  options: { optional: true; label?: string }
+): Record<string, string | number | boolean | null> | undefined;
+function readTelemetryAttributeRecord(
+  value: Record<string, unknown>,
+  key: string,
+  options: { optional?: boolean; label?: string } = {}
+) {
+  const label = options.label ?? key;
+  const raw = value[key];
+  if (raw === undefined || raw === null) {
+    if (options.optional) {
+      return undefined;
+    }
+    throw new IpcValidationError(label, [`${label} is required`]);
+  }
+  const record = asObject(raw, label);
+  const normalized: Record<string, string | number | boolean | null> = {};
+  Object.entries(record).forEach(([recordKey, recordValue]) => {
+    if (
+      recordValue !== null &&
+      typeof recordValue !== 'string' &&
+      typeof recordValue !== 'number' &&
+      typeof recordValue !== 'boolean'
+    ) {
+      throw new IpcValidationError(label, [
+        `${label}.${recordKey} must be a string, number, boolean, or null`
+      ]);
+    }
+    if (typeof recordValue === 'number' && !Number.isFinite(recordValue)) {
+      throw new IpcValidationError(label, [`${label}.${recordKey} must be a finite number`]);
     }
     normalized[recordKey] = recordValue;
   });

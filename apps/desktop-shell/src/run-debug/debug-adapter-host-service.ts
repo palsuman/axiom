@@ -5,6 +5,8 @@ import type { WebContents } from 'electron';
 
 import type {
   DebugBreakpointPayload,
+  DebugEvaluatePayload,
+  DebugEvaluateResponse,
   DebugSessionEvent,
   DebugSessionSnapshot,
   DebugSessionStartPayload,
@@ -211,6 +213,31 @@ export class DebugAdapterHostService extends EventEmitter {
       sessionId: targetSessionId,
       stopped: true,
       state: 'terminated'
+    };
+  }
+
+  async evaluate(sender: WebContents, payload: DebugEvaluatePayload): Promise<DebugEvaluateResponse> {
+    const targetSessionId = payload.sessionId ?? this.sessionByOwner.get(sender.id);
+    if (!targetSessionId) {
+      throw new Error('No active debug session for this window');
+    }
+    const managed = this.sessions.get(targetSessionId);
+    if (!managed) {
+      throw new Error(`Debug session ${targetSessionId} not found`);
+    }
+
+    const response = await managed.client.request('evaluate', {
+      expression: payload.expression,
+      frameId: payload.frameId,
+      context: payload.context ?? 'watch'
+    });
+    const body = response.body ?? {};
+    return {
+      sessionId: managed.snapshot.sessionId,
+      frameId: payload.frameId,
+      expression: payload.expression,
+      result: typeof body.result === 'string' ? body.result : String(body.result ?? ''),
+      type: typeof body.type === 'string' ? body.type : undefined
     };
   }
 

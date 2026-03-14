@@ -18,8 +18,8 @@
 - Startup flow rehydrates stored windows in most-recently-focused order; if none exist, a default window is created. Workspace arguments passed via CLI/OS integration open additional windows on top of the restored set.
 
 ## IPC & Preload
-- Contracts defined in `packages/contracts/ipc.ts` (`nexus:get-env`, `nexus:log`, `nexus:new-window`, `nexus:get-window-session`, `nexus:open-workspace`).
-- Preload exposes the safe API via `window.nexus.getEnv/log/openNewWindow/getWindowSession/openWorkspace` under `contextIsolation` with `nodeIntegration` disabled.
+- Contracts defined in `packages/contracts/ipc.ts` (`nexus:get-env`, `nexus:log`, `nexus:new-window`, `nexus:get-window-session`, `nexus:open-workspace`, telemetry APIs, and feature-flag APIs).
+- Preload exposes the safe API via `window.nexus.getEnv/log/openNewWindow/getWindowSession/openWorkspace/telemetry*/featureFlagsList` under `contextIsolation` with `nodeIntegration` disabled.
 - The current preload remains non-sandboxed at the Electron window level (`sandbox: false`) because the shell loads modular compiled preload files instead of a single bundle; renderer code still runs without Node globals.
 - Runtime `@nexus/*` alias resolution searches both compiled package roots (`dist/apps/desktop-shell/packages` and `dist/apps/workbench/packages`) so preload-loaded workbench modules can resolve shared platform/contracts code correctly.
 - `WindowManager` resolves the preload entry from the compiled `windowing/` output to `../preload.js` (with a same-directory fallback), keeping BrowserWindow startup aligned with the TypeScript build layout in `dist/apps/desktop-shell/apps/desktop-shell/src/`.
@@ -38,9 +38,23 @@
 - macOS finder/open-file events drop directly into the queue (forceNew), Windows/Linux links are parsed from `process.argv`, and failures are logged via the shared desktop logger for troubleshooting.
 
 ## Crash & Restart Handling (IDE-015)
-- `CrashService` (`apps/desktop-shell/src/system/crash-service.ts`) attaches to `uncaughtException`, `unhandledRejection`, and Electron `render-process-gone` events. On a fatal error it records the stack to `<NEXUS_DATA_DIR>/logs/crash.log`, notifies the user via a blocking dialog, and offers Restart, Quit, or Open Crash Log actions.
+- `CrashService` (`apps/desktop-shell/src/system/crash-service.ts`) attaches to `uncaughtException`, `unhandledRejection`, and Electron `render-process-gone` events. On a fatal error it delegates to `CrashReporter` (`apps/desktop-shell/src/system/crash-reporting.ts`), which builds an anonymized crash report, persists it to `<NEXUS_DATA_DIR>/logs/crash.log`, and optionally uploads it to an enterprise endpoint when the user explicitly opts in.
 - Restarting triggers `WindowManager.persistSessions()` before calling `app.relaunch()` so the restored windows match the previous session. Choosing “Open Crash Log” surfaces the log file and allows the user to keep the current process running for diagnostics.
-- Crash logging uses the same `.nexus` persistence contract—log folders are created as needed, and repeated crashes while a dialog is open are deduplicated.
+- When `NEXUS_CRASH_REPORTING_URL` is configured, the dialog exposes a `Send Report and Restart Nexus` action. Uploads are not automatic; every crash still requires user confirmation before a report leaves the machine.
+- Crash logging uses the same `.nexus` persistence contract, redacts absolute user/workspace paths before writing, and deduplicates repeated crashes while a dialog is open.
+
+## Telemetry Platform (IDE-117)
+- `TelemetryService` (`apps/desktop-shell/src/system/telemetry-service.ts`) wraps the shared `TelemetryStore` (`packages/platform/observability/telemetry-store.ts`) and persists structured events to `<NEXUS_DATA_DIR>/telemetry/events.jsonl`.
+- IPC contracts now expose `nexus:telemetry:track`, `nexus:telemetry:replay`, and `nexus:telemetry:health`, allowing preload and renderer callers to record structured events and retrieve local replay/health summaries without direct filesystem access.
+- Renderer logs sent through `nexus:log` are mirrored into telemetry as `renderer.log` events, while startup completion and fatal crashes emit `desktop.startup.completed` and `desktop.crash.captured`.
+- Telemetry attributes with sensitive key names are redacted before persistence so the platform is safe to expand before the consent center and exporter tasks land.
+
+## Feature Flags (IDE-121)
+- `FeatureFlagService` (`apps/desktop-shell/src/system/feature-flag-service.ts`) evaluates a typed flag registry from a local manifest, env overrides, CLI overrides, and an optional remote manifest refresh.
+- The shell now exposes `nexus:feature-flags:list` through preload so renderer/runtime consumers can inspect the current read-only flag snapshot without direct filesystem access.
+- Built-in flags currently cover observability rollout control: `observability.remoteCrashReporting`, `observability.performanceTracing`, and `observability.healthDiagnostics`.
+- Telemetry events automatically carry the current flag snapshot summary and `ff:<key>` tags for active flags, so staged rollout state is visible in replay and diagnostics.
+- Remote crash reporting now respects the `observability.remoteCrashReporting` kill switch even when the crash endpoint is configured in env.
 
 ## Startup Performance Budget (IDE-016)
 - `StartupMetrics` (`apps/desktop-shell/src/system/startup-metrics.ts`) records monotonic performance marks for bootstrap phases (`env-configured`, `app:ready`, `services:initialized`, `windows:restored`, `window-ready`). Once the first window is displayed, a JSON report is written to `<NEXUS_DATA_DIR>/logs/startup.json` and a summary line is logged.
@@ -52,10 +66,12 @@
 - `yarn nx run desktop-shell:serve` – builds the workbench renderer, builds the desktop shell, then launches Electron.
 
 ## Next Steps
-- Wire workspace selection UI (IDE-026) to `window.nexus.openWorkspace`, add crash reporting (IDE-015), and expand IPC contracts for explorer/editor features.
+- Expand diagnostics surfaces on top of telemetry and crash replay (`IDE-120`) and add consent/privacy controls (`IDE-170`).
 
 ## Auto-update Scaffolding (IDE-014)
 - `UpdateService` (`apps/desktop-shell/src/system/update-service.ts`) wraps Electron's `autoUpdater`, configures the feed URL from `NEXUS_UPDATE_URL` (or defaults to `https://updates.nexus.dev/<channel>`), and attaches rich logging for each lifecycle event (checking, available, not-available, download progress, downloaded, errors).
 - `NEXUS_UPDATE_CHANNEL` (`stable|beta|dev`) and `NEXUS_AUTO_UPDATE` (boolean) are parsed in `packages/platform/config/env.ts`. Auto-update defaults to production builds, remaining off for development/test unless explicitly enabled.
+- Crash-reporting config also lives in `packages/platform/config/env.ts`: `NEXUS_CRASH_REPORTING_URL`, `NEXUS_CRASH_REPORTING_ENABLED`, and `NEXUS_CRASH_REPORTING_TIMEOUT_MS`.
+- Feature-flag config also lives in `packages/platform/config/env.ts`: `NEXUS_FEATURE_FLAGS_FILE`, `NEXUS_FEATURE_FLAGS_URL`, and `NEXUS_FEATURE_FLAGS`.
 - IPC contracts expose `nexus:check-for-updates` and `nexus:install-update` so the renderer or command palette can trigger a manual check or install step. When initialized, production boots automatically trigger a background check after startup.
 - Installers must still provide signed artifacts per platform; this scaffolding simply wires the main process so release engineering can plug real feeds and trigger staged channels later in Phase 8.

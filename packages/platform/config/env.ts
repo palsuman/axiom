@@ -16,6 +16,12 @@ export type NexusEnv = {
   updateChannel: (typeof VALID_CHANNELS)[number];
   updateFeedUrl?: string;
   autoUpdateEnabled: boolean;
+  crashReportingEnabled: boolean;
+  crashReportingUrl?: string;
+  crashReportingTimeoutMs: number;
+  featureFlagsFile: string;
+  featureFlagsUrl?: string;
+  featureFlags?: string;
 };
 
 function getEnumEnv<T extends readonly string[]>(key: string, allowed: T, fallback: T[number]): T[number] {
@@ -33,6 +39,18 @@ function getEnvBool(key: string, defaultValue: boolean): boolean {
     return defaultValue;
   }
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+}
+
+function getPositiveIntEnv(key: string, defaultValue: number): number {
+  const value = process.env[key];
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${key}: ${value}`);
+  }
+  return parsed;
 }
 
 function resolveDir(value: string | undefined, fallback: string) {
@@ -54,6 +72,17 @@ function normalizeLocale(value: string | undefined) {
   return normalized;
 }
 
+function normalizeUrl(key: string, value: string | undefined) {
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+  try {
+    return new URL(value.trim()).toString();
+  } catch {
+    throw new Error(`Invalid ${key}: ${value}`);
+  }
+}
+
 export function readEnv(): NexusEnv {
   const nexusEnv = getEnumEnv('NEXUS_ENV', VALID_ENVS, 'development');
   const logLevel = getEnumEnv('LOG_LEVEL', VALID_LOG_LEVELS, 'info');
@@ -65,6 +94,15 @@ export function readEnv(): NexusEnv {
   const updateChannel = getEnumEnv('NEXUS_UPDATE_CHANNEL', VALID_CHANNELS, 'stable');
   const updateFeedUrl = process.env.NEXUS_UPDATE_URL;
   const autoUpdateEnabled = getEnvBool('NEXUS_AUTO_UPDATE', nexusEnv === 'production');
+  const crashReportingUrl = normalizeUrl('NEXUS_CRASH_REPORTING_URL', process.env.NEXUS_CRASH_REPORTING_URL);
+  const crashReportingEnabled = getEnvBool('NEXUS_CRASH_REPORTING_ENABLED', Boolean(crashReportingUrl));
+  const crashReportingTimeoutMs = getPositiveIntEnv('NEXUS_CRASH_REPORTING_TIMEOUT_MS', 5000);
+  const featureFlagsFile = resolveDir(
+    process.env.NEXUS_FEATURE_FLAGS_FILE,
+    path.join(nexusDataDir, 'config', 'feature-flags.json')
+  );
+  const featureFlagsUrl = normalizeUrl('NEXUS_FEATURE_FLAGS_URL', process.env.NEXUS_FEATURE_FLAGS_URL);
+  const featureFlags = process.env.NEXUS_FEATURE_FLAGS?.trim() || undefined;
   return {
     nexusEnv,
     logLevel,
@@ -74,6 +112,12 @@ export function readEnv(): NexusEnv {
     workspaceDataDir,
     updateChannel,
     updateFeedUrl,
-    autoUpdateEnabled
+    autoUpdateEnabled,
+    crashReportingEnabled,
+    crashReportingUrl,
+    crashReportingTimeoutMs,
+    featureFlagsFile,
+    featureFlagsUrl,
+    featureFlags
   };
 }

@@ -5,8 +5,8 @@ This subsystem owns the run/debug contract across shared schemas, Electron IPC, 
 - schema-backed `launch.json` editing and persistence
 - a DAP-compatible debug adapter host in the desktop shell
 - a first-party Node adapter process for launch-based sessions
-- renderer-side debug session state, output, and stack frame surfacing
-- MVP caveat: the bundled Node adapter currently prioritizes deterministic launch/session flow and stack/output contracts; full runtime-accurate breakpoint control is expanded in follow-on debug tasks.
+- renderer-side debug session state, output, stack frame selection, persisted breakpoints, and persisted watch expressions
+- MVP caveat: the bundled Node adapter currently prioritizes deterministic launch/session flow plus deterministic breakpoint/watch contracts; runtime-accurate source-level debugging still expands in follow-on adapter tasks.
 
 ## Ownership Boundary
 - `packages/platform/run-debug`
@@ -21,10 +21,11 @@ This subsystem owns the run/debug contract across shared schemas, Electron IPC, 
   - First-party Node debug adapter (`adapters/node-debug-adapter.ts`)
 - `apps/workbench/src/run-debug`
   - Launch configuration editor service
-  - Debug session store for active session snapshot, stack frames, and output
+  - Debug session store for active session snapshot, stack frames, persisted breakpoints, watch evaluation, and output
 
 ## Storage Contract
 - Workspace run configurations live at `.nexus/launch.json` under the active workspace root.
+- Workspace breakpoint/watch UI state lives in the workbench workspace data root as `<workspace-id>.debug.json`.
 - If the file does not exist, the desktop shell returns a default in-memory document:
 
 ```json
@@ -36,6 +37,8 @@ This subsystem owns the run/debug contract across shared schemas, Electron IPC, 
 
 - Saves are normalized through the shared serializer before hitting disk.
 - Invalid JSON or schema violations are returned as issues and never overwrite the last valid file.
+- Persisted debug UI state includes breakpoints `{ source, line, enabled }`, watch expressions `{ expression }`, and the selected stack frame id.
+- Watch expression definitions survive renderer restarts, but evaluated values remain session-scoped and are recomputed on the next stopped event.
 
 ## Public Contract
 ### JSON Schema
@@ -67,11 +70,19 @@ This subsystem owns the run/debug contract across shared schemas, Electron IPC, 
 - `nexus:debug:stop`
   - Accepts `{ sessionId?, terminateDebuggee? }`
   - Returns `{ sessionId, stopped, state }`
+- `nexus:debug:evaluate`
+  - Accepts `{ sessionId?, frameId?, expression, context }`
+  - Returns `{ sessionId, frameId?, expression, result, type? }`
 - `nexus:debug:event`
   - Main-to-renderer event stream containing session lifecycle/output updates
 
 ### Renderer UX
 - Sidebar view: `view.run`
+- Sidebar capabilities:
+  - launch configuration access
+  - breakpoint list management
+  - watch expression management
+  - call stack frame selection
 - Commands:
   - `nexus.run.focus`
   - `nexus.run.configurations.open`
@@ -82,14 +93,16 @@ This subsystem owns the run/debug contract across shared schemas, Electron IPC, 
 - Editor resources:
   - `run-config://form`
   - `run-config://json`
+- File editor placeholders expose a synthetic breakpoint gutter until Monaco is mounted.
 
 ## Debug Session Lifecycle
 1. Renderer requests `nexus:debug:start`.
 2. Host loads and validates `.nexus/launch.json`, resolves target configuration.
-3. Host starts adapter process, performs DAP `initialize`, optional `setBreakpoints`, then `launch`/`attach` + `configurationDone`.
+3. Host starts adapter process, performs DAP `initialize`, applies persisted enabled breakpoints through `setBreakpoints`, then `launch`/`attach` + `configurationDone`.
 4. Adapter events (`stopped`, `continued`, `output`, `terminated`) are forwarded over `nexus:debug:event`.
 5. On `stopped`, host fetches stack frames via DAP and includes them in session snapshots.
-6. Session ends through `nexus:debug:stop`, renderer close, or target termination.
+6. Renderer evaluates watch expressions for the selected stack frame through `nexus:debug:evaluate`.
+7. Session ends through `nexus:debug:stop`, renderer close, or target termination.
 
 ## Verification Path
 - Contracts: `NX_DAEMON=false yarn nx run contracts:test --skip-nx-cache`
@@ -101,6 +114,5 @@ This subsystem owns the run/debug contract across shared schemas, Electron IPC, 
   - `NX_DAEMON=false yarn nx run workbench:build --skip-nx-cache`
 
 ## Follow-on Tasks
-- `IDE-066` adds full breakpoint/watch UI and richer debug controls.
 - `IDE-157` introduces multi-runtime adapters (Node/Python/Go) with marketplace plumbing.
 - `IDE-069` wires `preLaunchTask` through the task runner pipeline.

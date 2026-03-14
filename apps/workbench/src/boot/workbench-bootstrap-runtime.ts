@@ -13,6 +13,16 @@ export function startWorkbenchRuntime(context: WorkbenchBootstrapContext) {
   cleanupHandlers.push(bindProcessLifecycle(context, () => terminalHost));
 
   void context.workspaceService.refreshRecentWorkspaces().catch(() => undefined);
+  const telemetryRequest = context.workspaceBridge?.telemetryTrack?.({
+    name: 'workbench.runtime.started',
+    scope: 'renderer',
+    level: 'info',
+    workspaceId: context.workspaceIdentity,
+    attributes: {
+      env: context.env
+    }
+  });
+  void telemetryRequest?.catch(() => undefined);
   initializeGitRuntime(context);
   restoreWorkbenchSurface(context);
   logWorkbenchLayout(context);

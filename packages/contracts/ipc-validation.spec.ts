@@ -45,6 +45,57 @@ describe('ipc-validation', () => {
     });
   });
 
+  it('validates telemetry payloads with attributes and measurements', () => {
+    const payload = validateIpcPayload('nexus:telemetry:track', {
+      name: 'workbench.started',
+      scope: 'renderer',
+      level: 'info',
+      attributes: {
+        locale: 'en-US',
+        trusted: true,
+        retries: 0,
+        note: null
+      },
+      measurements: {
+        startupMs: 123
+      },
+      tags: ['bootstrap', 'shell'],
+      timestamp: 123456
+    });
+
+    expect(payload).toEqual({
+      name: 'workbench.started',
+      scope: 'renderer',
+      level: 'info',
+      message: undefined,
+      attributes: {
+        locale: 'en-US',
+        trusted: true,
+        retries: 0,
+        note: null
+      },
+      measurements: {
+        startupMs: 123
+      },
+      tags: ['bootstrap', 'shell'],
+      timestamp: 123456,
+      sessionId: undefined,
+      workspaceId: undefined
+    });
+  });
+
+  it('rejects invalid telemetry attributes', () => {
+    expect(() =>
+      validateIpcPayload('nexus:telemetry:track', {
+        name: 'bad.event',
+        scope: 'renderer',
+        attributes: {
+          nested: { nope: true }
+        }
+      })
+    ).toThrow(/attributes\.nested/);
+  });
+
   it('rejects invalid workspace backup payloads deeply', () => {
     expect(() =>
       validateIpcPayload('nexus:workspace-backup:save', {
@@ -112,5 +163,21 @@ describe('ipc-validation', () => {
         terminateDebuggee: 'yes'
       })
     ).toThrow(IpcValidationError);
+  });
+
+  it('validates debug evaluate payloads', () => {
+    const payload = validateIpcPayload('nexus:debug:evaluate', {
+      sessionId: 'debug-1',
+      frameId: 1,
+      expression: 'process.pid',
+      context: 'watch'
+    });
+
+    expect(payload).toEqual({
+      sessionId: 'debug-1',
+      frameId: 1,
+      expression: 'process.pid',
+      context: 'watch'
+    });
   });
 });

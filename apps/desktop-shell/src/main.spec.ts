@@ -151,6 +151,81 @@ jest.mock('./system/startup-metrics', () => ({
   }))
 }));
 
+jest.mock('./system/telemetry-service', () => {
+  const state = {
+    track: jest.fn(),
+    trackRendererLog: jest.fn(),
+    replay: jest.fn(() => ({
+      records: [],
+      totalBuffered: 0,
+      dropped: 0,
+      bufferPath: '/tmp/telemetry/events.jsonl'
+    })),
+    getHealth: jest.fn(() => ({
+      bufferPath: '/tmp/telemetry/events.jsonl',
+      eventCount: 0,
+      fileBytes: 0,
+      dropped: 0,
+      lastSequence: 0,
+      oldestRecordedAt: undefined,
+      newestRecordedAt: undefined,
+      levels: {
+        error: 0,
+        warn: 0,
+        info: 0,
+        debug: 0
+      },
+      scopes: {
+        main: 0,
+        renderer: 0,
+        preload: 0,
+        shared: 0
+      }
+    }))
+  };
+
+  return {
+    __mock: state,
+    TelemetryService: jest.fn().mockImplementation(() => state)
+  };
+});
+
+jest.mock('./system/feature-flag-service', () => {
+  const state = {
+    initialize: jest.fn(() => ({
+      flags: [],
+      activeKeys: [],
+      summary: '',
+      sources: ['env'],
+      unknownFlags: [],
+      loadErrors: []
+    })),
+    refreshRemote: jest.fn().mockResolvedValue({
+      flags: [],
+      activeKeys: [],
+      summary: '',
+      sources: ['env'],
+      unknownFlags: [],
+      loadErrors: []
+    }),
+    list: jest.fn(() => ({
+      flags: [],
+      activeKeys: [],
+      summary: '',
+      sources: ['env'],
+      unknownFlags: [],
+      loadErrors: []
+    })),
+    isEnabled: jest.fn(() => true),
+    getTelemetrySummary: jest.fn(() => '')
+  };
+
+  return {
+    __mock: state,
+    FeatureFlagService: jest.fn().mockImplementation(() => state)
+  };
+});
+
 jest.mock('./workspace/workspace-dialog', () => ({
   pickWorkspaceDirectory: jest.fn().mockResolvedValue(undefined)
 }));
@@ -195,6 +270,7 @@ jest.mock('./run-debug/launch-configuration-service', () => {
 
 jest.mock('./run-debug/debug-adapter-host-service', () => {
   const state = {
+    evaluate: jest.fn(),
     start: jest.fn(),
     stop: jest.fn(),
     stopSessionByWorkspaceSession: jest.fn().mockResolvedValue(undefined),
@@ -313,6 +389,11 @@ describe('desktop shell main process', () => {
     expect(typeof electron.getHandle('nexus:open-workspace')).toBe('function');
     expect(typeof electron.getHandle('nexus:git:stage')).toBe('function');
     expect(typeof electron.getHandle('nexus:debug:start')).toBe('function');
+    expect(typeof electron.getHandle('nexus:debug:evaluate')).toBe('function');
+    expect(typeof electron.getHandle('nexus:telemetry:track')).toBe('function');
+    expect(typeof electron.getHandle('nexus:telemetry:replay')).toBe('function');
+    expect(typeof electron.getHandle('nexus:telemetry:health')).toBe('function');
+    expect(typeof electron.getHandle('nexus:feature-flags:list')).toBe('function');
     expect(typeof electron.getOn('nexus:log')).toBe('function');
   });
 
@@ -358,10 +439,26 @@ describe('desktop shell main process', () => {
     expect(debugHost.__mock.start).not.toHaveBeenCalled();
   });
 
+  it('rejects invalid debug evaluate payloads before evaluating expressions', async () => {
+    const debugHost = jest.requireMock('./run-debug/debug-adapter-host-service') as {
+      __mock: { evaluate: jest.Mock };
+    };
+
+    const handler = electron.getHandle('nexus:debug:evaluate');
+
+    expect(() => handler({ sender: { id: 9 } }, { expression: '' })).toThrow(
+      /Invalid payload for nexus:debug:evaluate/
+    );
+    expect(debugHost.__mock.evaluate).not.toHaveBeenCalled();
+  });
+
   it('normalizes valid renderer logs and ignores malformed payloads', async () => {
     const logger = jest.requireMock('./system/logger') as {
       log: jest.Mock;
       logError: jest.Mock;
+    };
+    const telemetry = jest.requireMock('./system/telemetry-service') as {
+      __mock: { trackRendererLog: jest.Mock };
     };
 
     const handler = electron.getOn('nexus:log');
@@ -370,7 +467,49 @@ describe('desktop shell main process', () => {
     handler({}, { level: 'verbose', message: 'bad' });
 
     expect(logger.log).toHaveBeenCalledWith('[renderer:warn]', 'renderer boot');
+    expect(telemetry.__mock.trackRendererLog).toHaveBeenCalledWith({
+      level: 'warn',
+      message: 'renderer boot'
+    });
     expect(logger.logError).toHaveBeenCalledWith('[ipc] rejected nexus:log payload', expect.any(Error));
+  });
+
+  it('routes telemetry IPC calls through the telemetry service', async () => {
+    const telemetry = jest.requireMock('./system/telemetry-service') as {
+      __mock: {
+        track: jest.Mock;
+        replay: jest.Mock;
+        getHealth: jest.Mock;
+      };
+    };
+
+    const trackHandler = electron.getHandle('nexus:telemetry:track');
+    const replayHandler = electron.getHandle('nexus:telemetry:replay');
+    const healthHandler = electron.getHandle('nexus:telemetry:health');
+
+    trackHandler({}, { name: 'renderer.command', scope: 'renderer' });
+    replayHandler({}, { limit: 10 });
+    healthHandler({});
+
+    expect(telemetry.__mock.track).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'renderer.command',
+        scope: 'renderer'
+      })
+    );
+    expect(telemetry.__mock.replay).toHaveBeenCalledWith({ limit: 10 });
+    expect(telemetry.__mock.getHealth).toHaveBeenCalled();
+  });
+
+  it('routes feature-flag IPC calls through the feature flag service', async () => {
+    const featureFlags = jest.requireMock('./system/feature-flag-service') as {
+      __mock: { list: jest.Mock };
+    };
+
+    const handler = electron.getHandle('nexus:feature-flags:list');
+    handler({});
+
+    expect(featureFlags.__mock.list).toHaveBeenCalled();
   });
 });
 

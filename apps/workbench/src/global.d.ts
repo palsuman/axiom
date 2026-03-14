@@ -2,12 +2,15 @@ import type {
   CopyEntriesPayload,
   CreateEntryPayload,
   DebugSessionEvent,
+  DebugEvaluatePayload,
+  DebugEvaluateResponse,
   DebugSessionSnapshot,
   DebugSessionStartPayload,
   DebugSessionStopPayload,
   DebugSessionStopResponse,
   DeleteEntriesPayload,
   FsOperationResponse,
+  FeatureFlagSnapshot,
   GitCommitPayload,
   GitCommitResult,
   GitDiffRequest,
@@ -25,6 +28,11 @@ import type {
   RenameEntryPayload,
   RunConfigurationLoadResponse,
   RunConfigurationSaveResponse,
+  TelemetryHealthResponse,
+  TelemetryRecord,
+  TelemetryReplayRequest,
+  TelemetryReplayResponse,
+  TelemetryTrackPayload,
   TerminalCreatePayload,
   TerminalDataEvent,
   TerminalDescriptor,
@@ -39,6 +47,10 @@ type NexusBridge = {
   openWorkspace(payload: OpenWorkspacePayload): Promise<unknown>;
   getRecentWorkspaces(): Promise<RecentWorkspaceEntry[]>;
   pickWorkspaceFolder(): Promise<PickWorkspaceResponse>;
+  telemetryTrack(payload: TelemetryTrackPayload): Promise<TelemetryRecord>;
+  telemetryReplay(payload?: TelemetryReplayRequest): Promise<TelemetryReplayResponse>;
+  telemetryGetHealth(): Promise<TelemetryHealthResponse>;
+  featureFlagsList(): Promise<FeatureFlagSnapshot>;
   fsCreateEntry(payload: CreateEntryPayload): Promise<FsOperationResponse>;
   fsRenameEntry(payload: RenameEntryPayload): Promise<FsOperationResponse>;
   fsMoveEntries(payload: MoveEntriesPayload): Promise<FsOperationResponse>;
@@ -49,6 +61,7 @@ type NexusBridge = {
   runConfigSave(text: string): Promise<RunConfigurationSaveResponse>;
   debugStart(payload?: DebugSessionStartPayload): Promise<DebugSessionSnapshot>;
   debugStop(payload?: DebugSessionStopPayload): Promise<DebugSessionStopResponse>;
+  debugEvaluate(payload: DebugEvaluatePayload): Promise<DebugEvaluateResponse>;
   onDebugEvent(listener: (event: DebugSessionEvent) => void): () => void;
   gitListRepositories(): Promise<GitRepositoryInfo[]>;
   gitGetStatus(payload: GitStatusRequest): Promise<GitStatusSummary>;

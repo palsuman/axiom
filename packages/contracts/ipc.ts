@@ -1,6 +1,10 @@
 export type CoreChannel =
   | 'nexus:get-env'
   | 'nexus:log'
+  | 'nexus:telemetry:track'
+  | 'nexus:telemetry:replay'
+  | 'nexus:telemetry:health'
+  | 'nexus:feature-flags:list'
   | 'nexus:new-window'
   | 'nexus:get-window-session'
   | 'nexus:open-workspace'
@@ -31,6 +35,7 @@ export type CoreChannel =
   | 'nexus:run-config:save'
   | 'nexus:debug:start'
   | 'nexus:debug:stop'
+  | 'nexus:debug:evaluate'
   | 'nexus:debug:event'
   | 'nexus:workspace-backup:save'
   | 'nexus:workspace-backup:load'
@@ -44,6 +49,94 @@ export type GetEnvResponse = {
 export type LogPayload = {
   level: 'error' | 'warn' | 'info' | 'debug';
   message: string;
+};
+
+export type TelemetryScope = 'main' | 'renderer' | 'preload' | 'shared';
+
+export type TelemetryLevel = 'error' | 'warn' | 'info' | 'debug';
+
+export type TelemetryAttributeValue = string | number | boolean | null;
+
+export type TelemetryTrackPayload = {
+  name: string;
+  scope: TelemetryScope;
+  level?: TelemetryLevel;
+  message?: string;
+  attributes?: Record<string, TelemetryAttributeValue>;
+  measurements?: Record<string, number>;
+  tags?: string[];
+  timestamp?: number;
+  sessionId?: string;
+  workspaceId?: string;
+};
+
+export type TelemetryRecord = {
+  sequence: number;
+  recordedAt: number;
+  name: string;
+  scope: TelemetryScope;
+  level: TelemetryLevel;
+  message?: string;
+  attributes: Record<string, TelemetryAttributeValue>;
+  measurements: Record<string, number>;
+  tags: string[];
+  sessionId?: string;
+  workspaceId?: string;
+};
+
+export type TelemetryReplayRequest = {
+  limit?: number;
+  scope?: TelemetryScope;
+  level?: TelemetryLevel;
+  name?: string;
+};
+
+export type TelemetryReplayResponse = {
+  records: TelemetryRecord[];
+  totalBuffered: number;
+  dropped: number;
+  bufferPath: string;
+};
+
+export type TelemetryHealthResponse = {
+  bufferPath: string;
+  eventCount: number;
+  fileBytes: number;
+  dropped: number;
+  lastSequence: number;
+  oldestRecordedAt?: number;
+  newestRecordedAt?: number;
+  levels: Record<TelemetryLevel, number>;
+  scopes: Record<TelemetryScope, number>;
+};
+
+export type FeatureFlagStage = 'stable' | 'preview' | 'internal';
+
+export type FeatureFlagReason = 'default' | 'override' | 'rollout' | 'kill-switch';
+
+export type FeatureFlagEvaluation = {
+  key: string;
+  description: string;
+  stage: FeatureFlagStage;
+  enabledByDefault: boolean;
+  enabled: boolean;
+  reason: FeatureFlagReason;
+  bucket: number;
+  rolloutPercentage?: number;
+  killSwitch: boolean;
+  sources: string[];
+};
+
+export type FeatureFlagSnapshot = {
+  flags: FeatureFlagEvaluation[];
+  activeKeys: string[];
+  summary: string;
+  sources: string[];
+  unknownFlags: string[];
+  loadErrors: string[];
+  configPath?: string;
+  remoteUrl?: string;
+  remoteLoadedAt?: number;
 };
 
 export type WindowSessionMetadata = {
@@ -371,6 +464,13 @@ export type DebugSessionStopPayload = {
   terminateDebuggee?: boolean;
 };
 
+export type DebugEvaluatePayload = {
+  sessionId?: string;
+  frameId?: number;
+  expression: string;
+  context?: 'watch' | 'repl' | 'hover';
+};
+
 export type DebugSource = {
   name?: string;
   path?: string;
@@ -404,6 +504,14 @@ export type DebugSessionStopResponse = {
   sessionId: string;
   stopped: boolean;
   state: DebugSessionState;
+};
+
+export type DebugEvaluateResponse = {
+  sessionId: string;
+  frameId?: number;
+  expression: string;
+  result: string;
+  type?: string;
 };
 
 export type DebugOutputEvent = {

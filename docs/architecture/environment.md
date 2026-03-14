@@ -15,6 +15,12 @@ Nexus relies on a strict set of environment variables so every service, extensio
 | `NEXUS_UPDATE_CHANNEL` | `stable` | Determines which release feed `electron-updater` uses. | `stable`, `beta`, or `dev`. |
 | `NEXUS_UPDATE_URL` | _unset_ | Optional explicit feed URL (overrides channel). | Used for air-gapped enterprise mirrors. |
 | `NEXUS_AUTO_UPDATE` | `production → true`, otherwise `false` | Toggles background update checks. | Accepts `1/0`, `true/false`, `yes/no`. |
+| `NEXUS_CRASH_REPORTING_URL` | _unset_ | Optional enterprise endpoint for anonymized crash-report uploads. | When set, the crash dialog can offer explicit opt-in upload. |
+| `NEXUS_CRASH_REPORTING_ENABLED` | `true` if URL is set, else `false` | Enables the remote crash-report sink. | Local crash logging remains on regardless. |
+| `NEXUS_CRASH_REPORTING_TIMEOUT_MS` | `5000` | Upload timeout for the remote crash-report sink. | Must be a positive integer. |
+| `NEXUS_FEATURE_FLAGS_FILE` | `<NEXUS_DATA_DIR>/config/feature-flags.json` | Local feature-flag manifest path. | Supports staged rollout and kill-switch rules. |
+| `NEXUS_FEATURE_FLAGS_URL` | _unset_ | Optional remote feature-flag manifest URL. | Refreshed after app ready. |
+| `NEXUS_FEATURE_FLAGS` | _unset_ | Inline env override list for feature flags. | Example: `flag.a=true,flag.b=rollout:25`. |
 
 ## Directory layout
 
@@ -25,10 +31,13 @@ Nexus relies on a strict set of environment variables so every service, extensio
   settings/
   ai/
   logs/
+  telemetry/
   workspaces/                 # default value for NEXUS_WORKSPACE_DATA
 ```
 
 - `NEXUS_DATA_DIR` defaults to `NEXUS_HOME`. Services can create subdirectories (`logs/`, `window-state/`, `telemetry/`) under this root without additional configuration.
+- Feature-flag manifests default to `<NEXUS_DATA_DIR>/config/feature-flags.json`, keeping rollout policy with the rest of local observability state.
+- Crash reports live under `NEXUS_DATA_DIR/logs/crash.log`; optional enterprise uploads reuse the same anonymized payload instead of building a separate format.
 - Renderer persistence is scoped to `NEXUS_WORKSPACE_DATA`; workspace trust, history, and session restore live here to keep them portable for enterprise sync.
 - Crash-safe backups live under `<NEXUS_WORKSPACE_DATA>/backups/<workspaceId>/snapshot.json`. Each snapshot includes dirty editors, terminal scrollback, and run/debug metadata while enforcing a hard 500 MB per-workspace cap.
 - `~/.nexus` is not assumed to exist; the runtime now guarantees creation through the storage layout helper described below.
@@ -63,5 +72,7 @@ Nexus relies on a strict set of environment variables so every service, extensio
 ## Operational guidance
 
 - **Enterprise overrides**: set `NEXUS_HOME` to a managed mount (e.g., `/var/opt/nexus/<user>`) and allow the migration helper to move existing `.nexus` data.
-- **Telemetry/privacy**: logs live under `NEXUS_DATA_DIR/logs`; redirecting this directory moves crash dumps and startup traces as well.
+- **Telemetry/privacy**: logs live under `NEXUS_DATA_DIR/logs` and structured telemetry buffers live under `NEXUS_DATA_DIR/telemetry`; redirecting this directory moves crash dumps, startup traces, and telemetry replay data together.
+- **Crash uploads**: `NEXUS_CRASH_REPORTING_URL` only enables an opt-in action in the crash dialog. No crash payload is uploaded automatically, and absolute user/workspace paths are redacted before persistence or upload.
+- **Feature flags**: use `NEXUS_FEATURE_FLAGS_FILE` for local policy, `NEXUS_FEATURE_FLAGS` for emergency env overrides, and `--feature-flag` / `--disable-feature-flag` for one-off launch-time changes.
 - **Backups**: copy the entire `NEXUS_HOME` directory; migration metadata ensures restores respect policy overrides on next launch.

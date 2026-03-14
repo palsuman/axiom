@@ -27,6 +27,41 @@ function createNexusBridge() {
     openWorkspace: jest.fn().mockResolvedValue(undefined),
     getRecentWorkspaces: jest.fn().mockResolvedValue([]),
     pickWorkspaceFolder: jest.fn().mockResolvedValue({}),
+    telemetryTrack: jest.fn().mockResolvedValue({
+      sequence: 1,
+      recordedAt: Date.now(),
+      name: 'workbench.runtime.started',
+      scope: 'renderer',
+      level: 'info',
+      attributes: {},
+      measurements: {},
+      tags: []
+    }),
+    telemetryReplay: jest.fn().mockResolvedValue({
+      records: [],
+      totalBuffered: 0,
+      dropped: 0,
+      bufferPath: '/tmp/telemetry/events.jsonl'
+    }),
+    telemetryGetHealth: jest.fn().mockResolvedValue({
+      bufferPath: '/tmp/telemetry/events.jsonl',
+      eventCount: 0,
+      fileBytes: 0,
+      dropped: 0,
+      lastSequence: 0,
+      oldestRecordedAt: undefined,
+      newestRecordedAt: undefined,
+      levels: { error: 0, warn: 0, info: 0, debug: 0 },
+      scopes: { main: 0, renderer: 0, preload: 0, shared: 0 }
+    }),
+    featureFlagsList: jest.fn().mockResolvedValue({
+      flags: [],
+      activeKeys: [],
+      summary: '',
+      sources: [],
+      unknownFlags: [],
+      loadErrors: []
+    }),
     fsCreateEntry: jest.fn().mockResolvedValue({ paths: [] }),
     fsRenameEntry: jest.fn().mockResolvedValue({ paths: [] }),
     fsMoveEntries: jest.fn().mockResolvedValue({ paths: [] }),
@@ -45,6 +80,15 @@ function createNexusBridge() {
       text: '{\n  "version": "1.0.0",\n  "configurations": []\n}',
       issues: []
     }),
+    debugStart: jest.fn(),
+    debugStop: jest.fn(),
+    debugEvaluate: jest.fn().mockResolvedValue({
+      sessionId: 'debug-1',
+      expression: 'process.pid',
+      result: '12345',
+      type: 'number'
+    }),
+    onDebugEvent: jest.fn().mockReturnValue(() => undefined),
     gitListRepositories: jest.fn().mockResolvedValue([]),
     gitGetStatus: jest.fn().mockResolvedValue({
       repositoryId: 'repo-1',

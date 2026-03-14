@@ -61,6 +61,12 @@ function buildEnv(homeDir: string): NexusEnv {
     workspaceDataDir: path.join(homeDir, 'workspaces'),
     updateChannel: 'stable',
     updateFeedUrl: undefined,
-    autoUpdateEnabled: false
+    autoUpdateEnabled: false,
+    crashReportingEnabled: false,
+    crashReportingUrl: undefined,
+    crashReportingTimeoutMs: 5000,
+    featureFlagsFile: path.join(homeDir, 'config', 'feature-flags.json'),
+    featureFlagsUrl: undefined,
+    featureFlags: undefined
   };
 }

@@ -16,9 +16,12 @@ import { DebugAdapterHostService } from '../run-debug/debug-adapter-host-service
 import { LaunchConfigurationService } from '../run-debug/launch-configuration-service';
 import { GitRepositoryService } from '../scm/git-repository-service';
 import { AssociationService } from '../system/association-service';
+import { CrashReporter } from '../system/crash-reporting';
 import { CrashService } from '../system/crash-service';
+import { FeatureFlagService } from '../system/feature-flag-service';
 import { log, logError } from '../system/logger';
 import { StartupMetrics } from '../system/startup-metrics';
+import { TelemetryService } from '../system/telemetry-service';
 import { UpdateService } from '../system/update-service';
 import { TerminalService } from '../terminal/terminal-service';
 import { KeymapService } from '../windowing/keymap-service';
@@ -42,8 +45,19 @@ const keymapService = new KeymapService(env);
 const menuService = new MenuService(windowManager, keymapService);
 const associationService = new AssociationService(env);
 const updateService = new UpdateService(env);
-const crashService = new CrashService(env, windowManager);
-const startupMetrics = new StartupMetrics(env);
+const featureFlagService = new FeatureFlagService(env);
+featureFlagService.initialize();
+const telemetryService = new TelemetryService(env, {
+  featureFlags: featureFlagService
+});
+const crashReporter = new CrashReporter(env, {
+  telemetry: telemetryService,
+  featureFlags: featureFlagService
+});
+const crashService = new CrashService(env, windowManager, {
+  reporter: crashReporter
+});
+const startupMetrics = new StartupMetrics(env, undefined, telemetryService);
 const workspaceHistory = new WorkspaceHistoryStore({
   historyDir: env.workspaceDataDir
 });
@@ -99,7 +113,17 @@ function registerIpcHandlers() {
       return;
     }
     log(`[renderer:${validated.level}]`, validated.message);
+    telemetryService.trackRendererLog(validated);
   });
+
+  ipcMain.handle('nexus:telemetry:track', (_event, payload) =>
+    telemetryService.track(requireValidPayload('nexus:telemetry:track', payload))
+  );
+  ipcMain.handle('nexus:telemetry:replay', (_event, payload) =>
+    telemetryService.replay(payload === undefined ? {} : requireValidPayload('nexus:telemetry:replay', payload))
+  );
+  ipcMain.handle('nexus:telemetry:health', () => telemetryService.getHealth());
+  ipcMain.handle('nexus:feature-flags:list', () => featureFlagService.list());
 
   ipcMain.handle('nexus:new-window', () => {
     windowManager.createWindow();
@@ -193,6 +217,9 @@ function registerIpcHandlers() {
   ipcMain.handle('nexus:debug:stop', (event, payload) =>
     debugAdapterHostService.stop(event.sender, requireValidPayload('nexus:debug:stop', payload))
   );
+  ipcMain.handle('nexus:debug:evaluate', (event, payload) =>
+    debugAdapterHostService.evaluate(event.sender, requireValidPayload('nexus:debug:evaluate', payload))
+  );
 
   ipcMain.handle('nexus:workspace-backup:save', (_event, payload) => {
     const payloadValue = requireValidPayload('nexus:workspace-backup:save', payload);
@@ -245,6 +272,29 @@ if (!singleInstance) {
 
 app.on('ready', () => {
   log('Electron app ready');
+  const featureFlags = featureFlagService.list();
+  telemetryService.track({
+    name: 'desktop.feature-flags.loaded',
+    scope: 'main',
+    level: 'info',
+    attributes: {
+      sources: featureFlags.sources.join(','),
+      featureFlags: featureFlags.summary
+    },
+    measurements: {
+      count: featureFlags.flags.length,
+      unknownCount: featureFlags.unknownFlags.length
+    }
+  });
+  telemetryService.track({
+    name: 'desktop.app.ready',
+    scope: 'main',
+    level: 'info',
+    attributes: {
+      env: env.nexusEnv,
+      updateChannel: env.updateChannel
+    }
+  });
   startupMetrics.mark('app:ready');
   registerIpcHandlers();
   keymapService.initialize();
@@ -264,6 +314,25 @@ app.on('ready', () => {
   }
   flushWorkspaceQueue();
   startupMetrics.mark('workspace:queue-flushed');
+
+  void featureFlagService.refreshRemote().then(snapshot => {
+    if (!snapshot.sources.includes('remote-url')) {
+      return;
+    }
+    telemetryService.track({
+      name: 'desktop.feature-flags.refreshed',
+      scope: 'main',
+      level: 'info',
+      attributes: {
+        remoteUrl: snapshot.remoteUrl ?? '',
+        featureFlags: snapshot.summary
+      },
+      measurements: {
+        count: snapshot.flags.length,
+        unknownCount: snapshot.unknownFlags.length
+      }
+    });
+  });
 });
 
 app.on('window-all-closed', () => {

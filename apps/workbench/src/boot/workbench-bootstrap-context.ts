@@ -70,7 +70,11 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     settingsService,
     shell
   });
-  const debugSessionStore = new DebugSessionStore(workspaceBridge);
+  const debugSessionStore = new DebugSessionStore({
+    bridge: workspaceBridge,
+    workspaceId: workspaceIdentity,
+    dataRoot: process.env.NEXUS_WORKSPACE_DATA
+  });
   const launchConfigurationEditorService = new LaunchConfigurationEditorService({
     shell,
     bridge: workspaceBridge

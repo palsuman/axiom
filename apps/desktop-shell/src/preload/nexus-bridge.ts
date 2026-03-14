@@ -4,12 +4,15 @@ import type {
   CopyEntriesPayload,
   CreateEntryPayload,
   DebugSessionEvent,
+  DebugEvaluatePayload,
+  DebugEvaluateResponse,
   DebugSessionSnapshot,
   DebugSessionStartPayload,
   DebugSessionStopPayload,
   DebugSessionStopResponse,
   DeleteEntriesPayload,
   FsOperationResponse,
+  FeatureFlagSnapshot,
   GetEnvResponse,
   GitCommitPayload,
   GitCommitResult,
@@ -29,6 +32,11 @@ import type {
   RenameEntryPayload,
   RunConfigurationLoadResponse,
   RunConfigurationSaveResponse,
+  TelemetryHealthResponse,
+  TelemetryRecord,
+  TelemetryReplayRequest,
+  TelemetryReplayResponse,
+  TelemetryTrackPayload,
   TerminalCreatePayload,
   TerminalDataEvent,
   TerminalDescriptor,
@@ -64,6 +72,18 @@ const api = {
   },
   log(payload: LogPayload) {
     ipcRenderer.send('nexus:log', payload);
+  },
+  async telemetryTrack(payload: TelemetryTrackPayload): Promise<TelemetryRecord> {
+    return ipcRenderer.invoke('nexus:telemetry:track', payload);
+  },
+  async telemetryReplay(payload: TelemetryReplayRequest = {}): Promise<TelemetryReplayResponse> {
+    return ipcRenderer.invoke('nexus:telemetry:replay', payload);
+  },
+  async telemetryGetHealth(): Promise<TelemetryHealthResponse> {
+    return ipcRenderer.invoke('nexus:telemetry:health');
+  },
+  async featureFlagsList(): Promise<FeatureFlagSnapshot> {
+    return ipcRenderer.invoke('nexus:feature-flags:list');
   },
   async openNewWindow() {
     return ipcRenderer.invoke('nexus:new-window');
@@ -109,6 +129,9 @@ const api = {
   },
   async debugStop(payload: DebugSessionStopPayload = {}): Promise<DebugSessionStopResponse> {
     return ipcRenderer.invoke('nexus:debug:stop', payload);
+  },
+  async debugEvaluate(payload: DebugEvaluatePayload): Promise<DebugEvaluateResponse> {
+    return ipcRenderer.invoke('nexus:debug:evaluate', payload);
   },
   async gitListRepositories(): Promise<GitRepositoryInfo[]> {
     return ipcRenderer.invoke('nexus:git:list-repositories');
