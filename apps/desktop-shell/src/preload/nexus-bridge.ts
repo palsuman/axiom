@@ -229,6 +229,7 @@ const api = {
 };
 
 contextBridge.exposeInMainWorld('nexus', api);
+(globalThis as typeof globalThis & { __NEXUS_PRELOAD_BRIDGE__?: typeof api }).__NEXUS_PRELOAD_BRIDGE__ = api;
 mountWorkbenchRenderer();
 
 declare global {

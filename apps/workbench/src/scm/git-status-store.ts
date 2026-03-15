@@ -6,6 +6,7 @@ import type {
   GitStatusRequest,
   GitStatusSummary
 } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 
 type GitBridge = {
   gitGetStatus(payload: GitStatusRequest): Promise<GitStatusSummary>;
@@ -200,10 +201,7 @@ export class GitStatusStore {
   }
 
   private static resolveBridge(): GitBridge | undefined {
-    if (typeof window !== 'undefined' && window.nexus) {
-      return window.nexus;
-    }
-    return undefined;
+    return resolveNexusBridge<GitBridge>();
   }
 }
 

@@ -6,6 +6,7 @@ import type {
   MoveEntriesPayload,
   RenameEntryPayload
 } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 import type { ExplorerStore } from './explorer-store';
 
 type FsBridge = NonNullable<Window['nexus']>;
@@ -14,7 +15,7 @@ export class ExplorerActions {
   private readonly bridge: FsBridge;
 
   constructor(private readonly store: ExplorerStore, bridge?: FsBridge) {
-    const resolvedBridge = bridge ?? (typeof window !== 'undefined' ? window.nexus : undefined);
+    const resolvedBridge = bridge ?? resolveNexusBridge<FsBridge>();
     if (!resolvedBridge) {
       throw new Error('Explorer bridge is unavailable');
     }

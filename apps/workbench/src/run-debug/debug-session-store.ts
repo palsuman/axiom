@@ -7,6 +7,7 @@ import type {
   DebugSessionStopPayload,
   DebugSessionStopResponse
 } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 import {
   DebugSessionUiStore,
   type DebugBreakpointEntry,
@@ -457,10 +458,7 @@ export class DebugSessionStore {
   }
 
   private static resolveBridge(): DebugBridge | undefined {
-    if (typeof window !== 'undefined' && window.nexus) {
-      return window.nexus;
-    }
-    return undefined;
+    return resolveNexusBridge<DebugBridge>();
   }
 }
 

@@ -194,7 +194,7 @@ export function registerWorkbenchCommands(context: WorkbenchBootstrapContext) {
     title: t('command.commandPalette.show', 'Show Command Palette'),
     category: 'View',
     keybinding: { mac: 'Cmd+Shift+P', win: 'Ctrl+Shift+P' },
-    handler: () => context.commandPalette.search('')
+    handler: () => context.commandPaletteController.open('')
   });
 
   context.commandRegistry.register({

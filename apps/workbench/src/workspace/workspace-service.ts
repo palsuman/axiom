@@ -1,4 +1,5 @@
 import type { OpenWorkspacePayload, RecentWorkspaceEntry, PickWorkspaceResponse } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 
 type WorkspaceBridge = {
   openWorkspace(payload: OpenWorkspacePayload): Promise<unknown>;
@@ -102,9 +103,6 @@ export class WorkspaceService {
   }
 
   private static resolveBridge(): WorkspaceBridge {
-    if (typeof window !== 'undefined' && window.nexus) {
-      return window.nexus;
-    }
-    return undefined;
+    return resolveNexusBridge<NonNullable<WorkspaceBridge>>();
   }
 }

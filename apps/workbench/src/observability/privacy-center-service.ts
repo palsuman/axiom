@@ -5,6 +5,7 @@ import type {
   TelemetryDeleteResponse,
   TelemetryExportResponse
 } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 import type { WorkbenchShell } from '../shell/workbench-shell';
 
 type PrivacyBridge =
@@ -203,15 +204,15 @@ export class PrivacyCenterService {
   }
 
   private static resolveBridge(): PrivacyBridge {
+    const bridge = resolveNexusBridge<NonNullable<PrivacyBridge>>();
     if (
-      typeof window !== 'undefined' &&
-      window.nexus &&
-      typeof window.nexus.privacyGetConsent === 'function' &&
-      typeof window.nexus.privacyUpdateConsent === 'function' &&
-      typeof window.nexus.privacyExportData === 'function' &&
-      typeof window.nexus.privacyDeleteData === 'function'
+      bridge &&
+      typeof bridge.privacyGetConsent === 'function' &&
+      typeof bridge.privacyUpdateConsent === 'function' &&
+      typeof bridge.privacyExportData === 'function' &&
+      typeof bridge.privacyDeleteData === 'function'
     ) {
-      return window.nexus;
+      return bridge;
     }
     return undefined;
   }

@@ -1,4 +1,5 @@
 import type { GitHistoryEntry, GitHistoryRequest, GitHistoryResponse } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 
 type HistoryBridge = {
   gitGetHistory(payload: GitHistoryRequest): Promise<GitHistoryResponse>;
@@ -113,9 +114,6 @@ export class GitHistoryStore {
   }
 
   private static resolveBridge(): HistoryBridge | undefined {
-    if (typeof window !== 'undefined' && window.nexus) {
-      return window.nexus;
-    }
-    return undefined;
+    return resolveNexusBridge<HistoryBridge>();
   }
 }

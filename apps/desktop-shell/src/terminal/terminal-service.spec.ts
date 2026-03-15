@@ -1,5 +1,7 @@
 import type { IPty } from 'node-pty';
 import { TerminalService } from './terminal-service';
+import fs from 'node:fs';
+import os from 'node:os';
 
 class MockPty implements IPty {
   pid = Math.floor(Math.random() * 1000);
@@ -35,12 +37,26 @@ class MockPty implements IPty {
 
 describe('TerminalService', () => {
   let latestPty: MockPty;
+  const originalShell = process.env.SHELL;
   const ptyFactory = (() => {
-    return () => {
+    return (command?: string, args?: string[]) => {
       latestPty = new MockPty();
+      latestPty.process = command ?? 'bash';
+      if (args) {
+        latestPty.write(args.join(' '));
+      }
       return latestPty;
     };
   })();
+
+  afterEach(() => {
+    if (originalShell === undefined) {
+      delete process.env.SHELL;
+    } else {
+      process.env.SHELL = originalShell;
+    }
+    jest.restoreAllMocks();
+  });
 
   it('creates terminals and emits data events', () => {
     const service = new TerminalService(ptyFactory);
@@ -73,5 +89,58 @@ describe('TerminalService', () => {
     service.createTerminal(3, 'session-a', { cols: 80, rows: 24 });
     service.disposeBySession('session-a');
     expect(latestPty.kill).toHaveBeenCalled();
+  });
+
+  it('falls back to a valid POSIX shell when SHELL is missing or invalid', () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    process.env.SHELL = '/path/that/does/not/exist';
+    const existsSpy = jest.spyOn(fs, 'existsSync').mockImplementation(candidate => {
+      return candidate === '/bin/zsh' || candidate === '/bin/sh';
+    });
+    const accessSpy = jest.spyOn(fs, 'accessSync').mockImplementation(() => undefined);
+    const userInfoSpy = jest.spyOn(os, 'userInfo').mockImplementation(() => ({
+      uid: 1,
+      gid: 1,
+      username: 'dev',
+      homedir: '/Users/dev',
+      shell: '/also/missing'
+    }));
+
+    const spawnSpy = jest.fn().mockImplementation(() => {
+      latestPty = new MockPty();
+      return latestPty;
+    });
+
+    const service = new TerminalService(spawnSpy);
+    service.createTerminal(1, 'session-1', { cols: 80, rows: 24 });
+
+    expect(userInfoSpy).toHaveBeenCalled();
+    expect(existsSpy).toHaveBeenCalled();
+    expect(accessSpy).toHaveBeenCalled();
+    expect(spawnSpy).toHaveBeenCalledWith('/bin/zsh', ['-l'], expect.any(Object));
+  });
+
+  it('degrades to an unavailable terminal when PTY spawn fails', done => {
+    const service = new TerminalService(() => {
+      throw new Error('posix_spawnp failed');
+    });
+
+    const dataListener = jest.fn(payload => {
+      expect(payload.ownerId).toBe(9);
+      expect(payload.terminalId).toBe(descriptor.terminalId);
+      expect(payload.data).toContain('terminal unavailable');
+      expect(payload.data).toContain('posix_spawnp failed');
+      done();
+    });
+
+    service.on('data', dataListener);
+    const descriptor = service.createTerminal(9, 'session-unavailable', { cols: 80, rows: 24 });
+
+    expect(descriptor.pid).toBe(0);
+    expect(descriptor.shell).toContain('unavailable');
+    expect(service.dispose({ terminalId: descriptor.terminalId })).toBe(true);
   });
 });

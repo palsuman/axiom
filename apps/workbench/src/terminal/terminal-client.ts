@@ -7,6 +7,7 @@ import type {
   TerminalResizePayload,
   TerminalWritePayload
 } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 
 type TerminalBridge = {
   terminalCreate(payload: TerminalCreatePayload): Promise<TerminalDescriptor>;
@@ -19,8 +20,9 @@ type TerminalBridge = {
 
 export class TerminalClient {
   private static resolveBridge(): TerminalBridge {
-    if (typeof window !== 'undefined' && window.nexus) {
-      return window.nexus;
+    const bridge = resolveNexusBridge<TerminalBridge>();
+    if (bridge) {
+      return bridge;
     }
     throw new Error('Terminal bridge unavailable');
   }

@@ -307,6 +307,8 @@ describe('workbench shell bootstrap', () => {
     expect(afterToggle.panel.visible).toBe(snapshot.panel.visible ? false : true);
     const paletteResults = await module.commandPalette.search('');
     expect(Array.isArray(paletteResults.items)).toBe(true);
+    await module.commandRegistry.executeCommand('nexus.commandPalette.show');
+    expect(module.commandPaletteController.getSnapshot().open).toBe(true);
     expect(module.settingsService.get('files.encoding')).toBe('utf8');
     await expect(module.commandRegistry.executeCommand('nexus.status.encoding')).resolves.toBe('utf8');
     await module.commandRegistry.executeCommand('nexus.locale.switch', { locale: 'fr-FR' });
@@ -319,6 +321,12 @@ describe('workbench shell bootstrap', () => {
       mode: 'form'
     });
     expect((settingsSnapshot as { editorResource: string }).editorResource).toBe('settings://user/form');
+    await module.commandPaletteController.open('privacy');
+    const privacyItemIndex = module.commandPaletteController
+      .getSnapshot()
+      .items.findIndex((item: { id: string }) => item.id === 'settings:privacy:center');
+    await module.commandPaletteController.executeItemAt(privacyItemIndex);
+    expect(module.commandPaletteController.getSnapshot().open).toBe(false);
     const privacySnapshot = await module.commandRegistry.executeCommand('nexus.privacy.center.open');
     expect((privacySnapshot as { editorResource: string }).editorResource).toBe('privacy://center');
     const jsonSnapshot = await module.commandRegistry.executeCommand('nexus.settings.editor.json', {

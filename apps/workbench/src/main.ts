@@ -2,6 +2,7 @@ export {
   shell,
   commandRegistry,
   commandPalette,
+  commandPaletteController,
   gitCommitStore,
   gitHistoryStore,
   gitStatusStore,

@@ -26,6 +26,7 @@ process.once('exit', () => {
 const shell = context.shell;
 const commandRegistry = context.commandRegistry;
 const commandPalette = context.commandPalette;
+const commandPaletteController = context.commandPaletteController;
 const gitCommitStore = context.gitCommitStore;
 const gitHistoryStore = context.gitHistoryStore;
 const gitStatusStore = context.gitStatusStore;
@@ -42,6 +43,7 @@ export {
   shell,
   commandRegistry,
   commandPalette,
+  commandPaletteController,
   gitCommitStore,
   gitHistoryStore,
   gitStatusStore,

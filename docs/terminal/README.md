@@ -11,6 +11,7 @@
   - Wraps `node-pty` and tracks terminals per window session + webContents id.
   - Emits `data` and `exit` events that are forwarded over IPC (`nexus:terminal:data`, `nexus:terminal:exit`) only to the owning renderer.
   - Supports create/write/resize/dispose plus session teardown handling (`disposeBySession`).
+  - Resolves the launch shell defensively: explicit payload override first, then OS-default/user shell, then platform fallbacks (`/bin/zsh`, `/bin/bash`, `/bin/sh` on POSIX; `ComSpec`, `powershell.exe`, `cmd.exe` on Windows) to avoid `posix_spawnp` startup failures from bad shell env vars.
 - IPC handlers in `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`
   - `nexus:terminal:create`, `write`, `resize`, `dispose` map directly to the service.
   - Session removal automatically closes orphan PTYs to prevent leaks.
@@ -70,6 +71,7 @@ Events: `TerminalDataEvent` + `TerminalExitEvent`.
 
 ## Acceptance Criteria
 - Creating a terminal spawns the OS-default shell (respecting overrides) and streams output/input without blocking the main thread.
+- If PTY startup fails on the local machine, the terminal service now degrades to an unavailable session descriptor and streams a readable failure banner instead of aborting workbench startup.
 - Resizing the window propagates new cols/rows to the PTY and xterm instance using `fit`.
 - Closing a window or switching workspaces disposes PTYs, preventing stray processes.
 

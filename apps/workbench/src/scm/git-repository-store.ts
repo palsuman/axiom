@@ -1,4 +1,5 @@
 import type { GitRepositoryInfo } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 
 type NexusBridge = {
   gitListRepositories?: () => Promise<GitRepositoryInfo[]>;
@@ -9,7 +10,7 @@ export class GitRepositoryStore {
   private repositories: GitRepositoryInfo[] = [];
 
   constructor(bridge?: NexusBridge) {
-    this.bridge = bridge ?? (typeof window !== 'undefined' ? window.nexus : undefined);
+    this.bridge = bridge ?? resolveNexusBridge<NexusBridge>();
   }
 
   async refresh() {

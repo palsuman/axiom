@@ -1,7 +1,9 @@
 import { bootstrapPersistentWorkbenchShell } from '../shell/workbench-layout-store';
 import { CommandRegistry } from '../commands/command-registry';
 import { CommandPaletteService } from '../commands/command-palette';
+import { CommandPaletteController } from '../commands/command-palette-controller';
 import { I18nService, WORKBENCH_I18N_BUNDLES } from '../i18n/i18n-service';
+import { resolveNexusBridge } from './nexus-bridge-resolver';
 import { WorkspaceService } from '../workspace/workspace-service';
 import { WorkspaceStateService } from '../workspace/workspace-state-service';
 import { GitCommitStore } from '../scm/git-commit-store';
@@ -16,7 +18,7 @@ import { PrivacyCenterService } from '../observability/privacy-center-service';
 import { WorkspaceHotExitService } from '../workspace/workspace-hot-exit-service';
 import type { ThemeRuntime } from '@nexus/platform/theming/theme-runtime';
 
-type NexusBridge = typeof window.nexus | undefined;
+type NexusBridge = NonNullable<Window['nexus']> | undefined;
 
 export type WorkbenchBootstrapContext = {
   env: string;
@@ -29,6 +31,7 @@ export type WorkbenchBootstrapContext = {
   hotExitService: WorkspaceHotExitService;
   commandRegistry: CommandRegistry;
   commandPalette: CommandPaletteService;
+  commandPaletteController: CommandPaletteController;
   workspaceService: WorkspaceService;
   gitRepositoryStore: GitRepositoryStore;
   gitStatusStore: GitStatusStore;
@@ -55,7 +58,8 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
   const hotExitService = new WorkspaceHotExitService({ workspaceId: workspaceIdentity });
   const commandRegistry = new CommandRegistry();
   const commandPalette = new CommandPaletteService(commandRegistry, { i18n: i18nService });
-  const workspaceBridge = typeof window !== 'undefined' ? window.nexus : undefined;
+  const commandPaletteController = new CommandPaletteController(commandPalette, commandRegistry);
+  const workspaceBridge = resolveNexusBridge<NonNullable<NexusBridge>>();
   const workspaceService = new WorkspaceService(workspaceBridge);
   const gitRepositoryStore = new GitRepositoryStore(workspaceBridge);
   const gitStatusStore = new GitStatusStore(workspaceBridge);
@@ -99,6 +103,7 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     hotExitService,
     commandRegistry,
     commandPalette,
+    commandPaletteController,
     workspaceService,
     gitRepositoryStore,
     gitStatusStore,

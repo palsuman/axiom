@@ -103,6 +103,8 @@ declare global {
   interface Window {
     nexus?: NexusBridge;
   }
+
+  var __NEXUS_PRELOAD_BRIDGE__: NexusBridge | undefined;
 }
 
 export {};

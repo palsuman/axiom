@@ -1,4 +1,5 @@
 import type { GitCommitPayload, GitCommitResult } from '@nexus/contracts/ipc';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 
 type CommitBridge = {
   gitCommit(payload: GitCommitPayload): Promise<GitCommitResult>;
@@ -119,9 +120,6 @@ export class GitCommitStore {
   }
 
   private static resolveBridge(): CommitBridge | undefined {
-    if (typeof window !== 'undefined' && window.nexus) {
-      return window.nexus;
-    }
-    return undefined;
+    return resolveNexusBridge<CommitBridge>();
   }
 }

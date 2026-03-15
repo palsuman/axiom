@@ -11,6 +11,7 @@ import {
   type LaunchConfigurationDocument,
   type LaunchConfigurationIssue
 } from '@nexus/platform/run-debug/launch-config';
+import { resolveNexusBridge } from '../boot/nexus-bridge-resolver';
 import type { WorkbenchShell } from '../shell/workbench-shell';
 
 type LaunchConfigurationBridge = {
@@ -247,13 +248,9 @@ export class LaunchConfigurationEditorService {
   }
 
   private static resolveBridge(): LaunchConfigurationBridge {
-    if (
-      typeof window !== 'undefined' &&
-      window.nexus &&
-      typeof window.nexus.runConfigLoad === 'function' &&
-      typeof window.nexus.runConfigSave === 'function'
-    ) {
-      return window.nexus;
+    const bridge = resolveNexusBridge<NonNullable<LaunchConfigurationBridge>>();
+    if (bridge && typeof bridge.runConfigLoad === 'function' && typeof bridge.runConfigSave === 'function') {
+      return bridge;
     }
     return undefined;
   }

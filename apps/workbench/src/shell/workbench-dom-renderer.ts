@@ -2,6 +2,11 @@ import type { SettingsScope } from '@nexus/platform/settings/settings-registry';
 import { createRequire } from 'node:module';
 import type { WorkbenchShell, WorkbenchSnapshot } from './workbench-shell';
 import type { CommandRegistry } from '../commands/command-registry';
+import type {
+  CommandPaletteController,
+  CommandPaletteControllerSnapshot
+} from '../commands/command-palette-controller';
+import { matchesCommandPaletteShortcut } from '../commands/command-palette-controller';
 import type { GitStatusStore } from '../scm/git-status-store';
 import type { GitCommitStore } from '../scm/git-commit-store';
 import type { GitHistoryStore } from '../scm/git-history-store';
@@ -31,6 +36,10 @@ type MountHandle = {
 type RendererElements = {
   host: HTMLElement;
   announcer: HTMLElement;
+  commandPaletteOverlay: HTMLElement;
+  commandPaletteInput: HTMLInputElement;
+  commandPaletteMeta: HTMLElement;
+  commandPaletteList: HTMLElement;
   activityBar: HTMLElement;
   sidebar: HTMLElement;
   secondarySidebar: HTMLElement;
@@ -48,6 +57,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
   const {
     shell,
     commandRegistry,
+    commandPaletteController,
     gitStatusStore,
     gitCommitStore,
     gitHistoryStore,
@@ -57,12 +67,20 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     launchConfigurationEditorService,
     i18nService
   } = bootstrap;
+  let restorePaletteFocus: HTMLElement | null = null;
+  let previousPaletteOpen = commandPaletteController.getSnapshot().open;
 
   const render = () => {
     const focusId = captureFocusedElementId(elements.host);
     const snapshot = shell.layoutSnapshot();
     const labels = createWorkbenchAccessibilityLabels(i18nService);
+    const commandPaletteSnapshot = commandPaletteController.getSnapshot();
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (commandPaletteSnapshot.open && !previousPaletteOpen) {
+      restorePaletteFocus = activeElement && elements.host.contains(activeElement) ? activeElement : null;
+    }
     renderLayout(elements, snapshot);
+    renderCommandPalette(elements, commandPaletteSnapshot, i18nService);
     renderActivityBar(elements.activityBar, snapshot, commandRegistry, labels);
     renderSidebar(
       elements.sidebar,
@@ -89,11 +107,25 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     renderPanel(elements, snapshot, labels);
     renderStatusBar(elements.statusBar, snapshot, commandRegistry, i18nService, labels);
     elements.announcer.textContent = buildWorkbenchLiveRegionMessage(snapshot, i18nService);
-    restoreFocusedElement(elements.host, focusId);
+    if (commandPaletteSnapshot.open) {
+      elements.commandPaletteInput.focus();
+      elements.commandPaletteInput.setSelectionRange(
+        elements.commandPaletteInput.value.length,
+        elements.commandPaletteInput.value.length
+      );
+    } else if (previousPaletteOpen && restorePaletteFocus && restorePaletteFocus.isConnected) {
+      restorePaletteFocus.focus();
+      restorePaletteFocus = null;
+    }
+    previousPaletteOpen = commandPaletteSnapshot.open;
+    if (!commandPaletteSnapshot.open) {
+      restoreFocusedElement(elements.host, focusId);
+    }
   };
 
   const disposers = [
     shell.onLayoutChange(() => render()),
+    commandPaletteController.onDidChange(() => render()),
     gitStatusStore.onDidChange(() => render()),
     gitCommitStore.onDidChange(() => render()),
     gitHistoryStore.onDidChange(() => render()),
@@ -108,6 +140,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     elements.host,
     shell,
     commandRegistry,
+    commandPaletteController,
     settingsEditorService,
     privacyCenterService,
     launchConfigurationEditorService,
@@ -139,6 +172,27 @@ function ensureWorkbenchDom(container: HTMLElement): RendererElements {
         Skip to editor
       </a>
       <div class="nexus-sr-only" aria-live="polite" aria-atomic="true" data-workbench-announcer="true"></div>
+      <div class="nexus-command-palette-overlay" data-command-palette-overlay="true" hidden>
+        <section
+          class="nexus-command-palette"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Command palette"
+        >
+          <div class="nexus-command-palette-header">
+            <input
+              class="nexus-command-palette-input"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Type a command or open a workspace"
+              data-command-palette-query="true"
+            />
+            <div class="nexus-command-palette-meta" data-command-palette-meta="true"></div>
+          </div>
+          <div class="nexus-command-palette-list" data-command-palette-list="true"></div>
+        </section>
+      </div>
       <section class="nexus-surface nexus-activity-bar" data-surface="activityBar"></section>
       <section class="nexus-surface nexus-sidebar" data-surface="primarySidebar"></section>
       <section class="nexus-surface nexus-secondary-sidebar" data-surface="secondarySidebar"></section>
@@ -169,6 +223,10 @@ function ensureWorkbenchDom(container: HTMLElement): RendererElements {
   return {
     host,
     announcer: requireElement(host, '[data-workbench-announcer="true"]'),
+    commandPaletteOverlay: requireElement(host, '[data-command-palette-overlay="true"]'),
+    commandPaletteInput: requireElement(host, '[data-command-palette-query="true"]') as HTMLInputElement,
+    commandPaletteMeta: requireElement(host, '[data-command-palette-meta="true"]'),
+    commandPaletteList: requireElement(host, '[data-command-palette-list="true"]'),
     activityBar: requireElement(host, '[data-surface="activityBar"]'),
     sidebar: requireElement(host, '[data-surface="primarySidebar"]'),
     secondarySidebar: requireElement(host, '[data-surface="secondarySidebar"]'),
@@ -185,6 +243,7 @@ function bindWorkbenchEvents(
   host: HTMLElement,
   shell: WorkbenchShell,
   commandRegistry: CommandRegistry,
+  commandPaletteController: CommandPaletteController,
   settingsEditorService: SettingsEditorService,
   privacyCenterService: PrivacyCenterService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
@@ -199,6 +258,10 @@ function bindWorkbenchEvents(
   host.addEventListener('click', event => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]');
     if (!target) {
+      const overlay = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-command-palette-overlay="true"]') : null;
+      if (overlay && event.target === overlay) {
+        commandPaletteController.close();
+      }
       return;
     }
     const action = target.dataset.action;
@@ -236,6 +299,14 @@ function bindWorkbenchEvents(
         if (target.dataset.commandId) {
           const args = parseDatasetJson(target.dataset.commandArgs);
           void commandRegistry.executeCommand(target.dataset.commandId, args);
+        }
+        break;
+      case 'command-palette-dismiss':
+        commandPaletteController.close();
+        break;
+      case 'command-palette-select':
+        if (target.dataset.index) {
+          void commandPaletteController.executeItemAt(Number(target.dataset.index));
         }
         break;
       case 'settings-open':
@@ -434,6 +505,10 @@ function bindWorkbenchEvents(
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
+    if (target.dataset.commandPaletteQuery === 'true') {
+      void commandPaletteController.setQuery(target.value);
+      return;
+    }
     if (target.dataset.settingsQuery === 'true') {
       settingsEditorService.setQuery(target.value);
       return;
@@ -443,7 +518,27 @@ function bindWorkbenchEvents(
     }
   });
 
-  host.addEventListener('keydown', event => {
+  host.ownerDocument.addEventListener('keydown', event => {
+    if (matchesCommandPaletteShortcut(event)) {
+      void commandPaletteController.handleKeydown(event);
+      return;
+    }
+
+    const paletteOpen = commandPaletteController.getSnapshot().open;
+    if (paletteOpen && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) {
+      void commandPaletteController.handleKeydown(event);
+      return;
+    }
+
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.dataset.commandPaletteQuery === 'true' &&
+      (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Escape')
+    ) {
+      void commandPaletteController.handleKeydown(event);
+      return;
+    }
+
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-roving-tab="true"]');
     if (!target) {
       return;
@@ -481,6 +576,94 @@ function renderLayout(elements: RendererElements, snapshot: WorkbenchSnapshot) {
   applyPlacement(elements.editor, snapshot.placements.editor);
   applyPlacement(elements.panel, snapshot.placements.panel);
   applyPlacement(elements.statusBar, snapshot.placements.statusBar);
+}
+
+function renderCommandPalette(
+  elements: RendererElements,
+  snapshot: CommandPaletteControllerSnapshot,
+  i18nService: I18nService
+) {
+  elements.commandPaletteOverlay.hidden = !snapshot.open;
+  elements.commandPaletteOverlay.setAttribute('aria-hidden', snapshot.open ? 'false' : 'true');
+  if (document.body) {
+    document.body.classList.toggle('nexus-command-palette-open', snapshot.open);
+  }
+
+  if (!snapshot.open) {
+    return;
+  }
+
+  if (elements.commandPaletteInput.value !== snapshot.query) {
+    elements.commandPaletteInput.value = snapshot.query;
+  }
+
+  const resultCount = snapshot.items.length;
+  const resultLabel = i18nService.translate(
+    resultCount === 1 ? 'commandPalette.results.one' : 'commandPalette.results.other',
+    {
+      fallback: resultCount === 1 ? '1 result' : '{count} results',
+      args: { count: resultCount }
+    }
+  );
+  const queryLabel = snapshot.query
+    ? i18nService.translate('commandPalette.query.summary', {
+        fallback: 'Searching for "{query}"',
+        args: { query: snapshot.query }
+      })
+    : i18nService.translate('commandPalette.query.empty', {
+        fallback: 'Showing commands, workspaces, settings, and run targets'
+      });
+
+  elements.commandPaletteMeta.textContent = snapshot.busy ? 'Searching…' : `${queryLabel} • ${resultLabel}`;
+
+  if (snapshot.error) {
+    elements.commandPaletteList.innerHTML = `
+      <div class="nexus-command-palette-empty" role="alert">
+        <strong>Command failed</strong>
+        <p>${escapeHtml(snapshot.error)}</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (!snapshot.items.length) {
+    elements.commandPaletteList.innerHTML = `
+      <div class="nexus-command-palette-empty">
+        <strong>No results</strong>
+        <p>Try a command name, workspace path, setting key, or launch configuration.</p>
+      </div>
+    `;
+    return;
+  }
+
+  elements.commandPaletteList.innerHTML = snapshot.items
+    .map((item, index) => {
+      const detail = item.detail ? `<span class="nexus-command-palette-item-detail">${escapeHtml(item.detail)}</span>` : '';
+      const description = item.description
+        ? `<span class="nexus-command-palette-item-description">${escapeHtml(item.description)}</span>`
+        : '';
+      const source = item.source ? `<span class="nexus-command-palette-item-source">${escapeHtml(item.source)}</span>` : '';
+      return `
+        <button
+          type="button"
+          class="nexus-command-palette-item${snapshot.activeIndex === index ? ' is-active' : ''}"
+          data-action="command-palette-select"
+          data-index="${index}"
+          title="${escapeHtml(item.label)}"
+          aria-label="${escapeHtml(item.label)}"
+        >
+          <span class="nexus-command-palette-item-main">
+            <span class="nexus-command-palette-item-label">${escapeHtml(item.label)}</span>
+            ${detail}
+          </span>
+          <span class="nexus-command-palette-item-meta">
+            ${description}
+            ${source}
+          </span>
+        </button>
+      `;
+    })
+    .join('');
 }
 
 function renderActivityBar(
@@ -1992,12 +2175,108 @@ function injectWorkbenchStyles() {
       content: none;
     }
     #nexus-workbench-app {
+      position: relative;
       display: grid;
       width: 100vw;
       height: 100vh;
       background:
         radial-gradient(circle at top right, color-mix(in srgb, var(--nexus-panel-background, #202020) 85%, transparent), transparent 40%),
         var(--nexus-workbench-background, #181818);
+    }
+    .nexus-command-palette-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: start center;
+      padding: 56px 16px 16px;
+      background: color-mix(in srgb, var(--nexus-workbench-background, #181818) 72%, transparent);
+      backdrop-filter: blur(10px);
+    }
+    .nexus-command-palette-overlay[hidden] {
+      display: none;
+    }
+    .nexus-command-palette {
+      width: min(760px, 100%);
+      max-height: min(70vh, 720px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--nexus-border, rgba(255,255,255,0.08));
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--nexus-panel-background, #202020) 96%, white 4%), var(--nexus-panel-background, #202020));
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.42);
+    }
+    .nexus-command-palette-header {
+      padding: 14px;
+      border-bottom: 1px solid var(--nexus-border, rgba(255,255,255,0.08));
+      display: grid;
+      gap: 8px;
+    }
+    .nexus-command-palette-input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--nexus-editor-background, #141414) 86%, white 14%);
+      color: inherit;
+      font: inherit;
+      font-size: 18px;
+      padding: 14px 16px;
+    }
+    .nexus-command-palette-meta {
+      font-size: 12px;
+      color: var(--nexus-description-foreground, rgba(255,255,255,0.72));
+    }
+    .nexus-command-palette-list {
+      overflow: auto;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    .nexus-command-palette-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      font: inherit;
+      cursor: pointer;
+    }
+    .nexus-command-palette-item:hover,
+    .nexus-command-palette-item.is-active {
+      background: color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 18%, transparent);
+      border-color: color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 35%, transparent);
+    }
+    .nexus-command-palette-item-main,
+    .nexus-command-palette-item-meta {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .nexus-command-palette-item-label {
+      font-weight: 600;
+    }
+    .nexus-command-palette-item-detail,
+    .nexus-command-palette-item-description,
+    .nexus-command-palette-item-source {
+      color: var(--nexus-description-foreground, rgba(255,255,255,0.72));
+      font-size: 12px;
+    }
+    .nexus-command-palette-item-source {
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .nexus-command-palette-empty {
+      padding: 20px 16px 24px;
+      color: var(--nexus-description-foreground, rgba(255,255,255,0.8));
     }
     .nexus-sr-only {
       position: absolute;
@@ -2094,6 +2373,8 @@ function injectWorkbenchStyles() {
     .nexus-editor-tab:focus-visible,
     .nexus-status-item:focus-visible,
     .nexus-list-item-button:focus-visible,
+    .nexus-command-palette-input:focus-visible,
+    .nexus-command-palette-item:focus-visible,
     .nexus-input:focus-visible,
     .nexus-select:focus-visible,
     .nexus-search-input:focus-visible,
