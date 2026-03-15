@@ -51,6 +51,10 @@ export class TelemetryStore {
     return cloneRecord(record);
   }
 
+  preview(payload: TelemetryTrackPayload): TelemetryRecord {
+    return cloneRecord(this.normalizePayload(payload));
+  }
+
   replay(request: TelemetryReplayRequest = {}): TelemetryReplayResponse {
     const records = this.filterRecords(request);
     const limit = request.limit ?? 100;
@@ -91,6 +95,20 @@ export class TelemetryStore {
       newestRecordedAt: this.state.records[this.state.records.length - 1]?.recordedAt,
       levels,
       scopes
+    };
+  }
+
+  getAllRecords() {
+    return this.state.records.map(cloneRecord);
+  }
+
+  clear() {
+    const clearedRecords = this.state.records.length;
+    this.state.records = [];
+    this.persist();
+    return {
+      clearedRecords,
+      bufferPath: this.bufferPath
     };
   }
 

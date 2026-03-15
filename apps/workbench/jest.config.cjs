@@ -3,5 +3,8 @@ module.exports = {
   rootDir: __dirname,
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.spec.ts'],
-  moduleFileExtensions: ['ts', 'js']
+  moduleFileExtensions: ['ts', 'js'],
+  moduleNameMapper: {
+    '^@nexus/(.*)$': '<rootDir>/../../packages/$1'
+  }
 };

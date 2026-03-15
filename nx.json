@@ -29,6 +29,7 @@
   "projects": {
     "workbench": "apps/workbench",
     "desktop-shell": "apps/desktop-shell",
+    "ai-core": "packages/ai-core",
     "platform": "packages/platform",
     "icons": "packages/icons"
   }

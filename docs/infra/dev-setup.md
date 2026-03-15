@@ -18,10 +18,11 @@
 
 ## Scripts
 - `scripts/dev/setup.sh`: idempotent bootstrap.
-- `scripts/dev/install-llamacpp.sh`: clones + builds llama.cpp into `.nexus/llama.cpp`.
+- `scripts/dev/install-llamacpp.sh`: clones + builds llama.cpp into `<NEXUS_DATA_DIR>/ai/llama.cpp` (defaults to `.nexus/ai/llama.cpp`).
 
 ## Env Var Summary
 - `NEXUS_HOME` / `NEXUS_DATA_DIR`: override default `.nexus` path if needed.
+- `NEXUS_LLAMACPP_ROOT` / `NEXUS_LLAMACPP_BINARY`: override the managed llama.cpp runtime path if needed.
 - `NEXUS_REGISTRY_URL`: optional registry override for Yarn.
 
 ## Verification

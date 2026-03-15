@@ -142,4 +142,29 @@ describe('CrashReporter', () => {
       error: 'Crash reporting endpoint is not available'
     });
   });
+
+  it('respects privacy consent for remote crash sharing', async () => {
+    const env = createMockEnv({
+      crashReportingEnabled: true,
+      crashReportingUrl: 'https://ops.example.com/crash'
+    });
+    const reporter = new CrashReporter(env, {
+      fetch: jest.fn(),
+      featureFlags: {
+        isEnabled: () => true
+      },
+      privacy: {
+        canShareCrashReports: () => false
+      }
+    });
+    const { report, submitAvailable } = reporter.capture('uncaughtException', new Error('Boom'));
+
+    const result = await reporter.submit(report);
+
+    expect(submitAvailable).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: 'Crash reporting endpoint is not available'
+    });
+  });
 });

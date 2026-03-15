@@ -14,6 +14,12 @@ import type {
   FsOperationResponse,
   FeatureFlagSnapshot,
   GetEnvResponse,
+  LlamaControllerBenchmarkRequest,
+  LlamaControllerBenchmarkResponse,
+  LlamaControllerHealthRequest,
+  LlamaControllerHealthResponse,
+  LlamaControllerStartPayload,
+  LlamaControllerStopPayload,
   GitCommitPayload,
   GitCommitResult,
   GitDiffRequest,
@@ -32,6 +38,13 @@ import type {
   RenameEntryPayload,
   RunConfigurationLoadResponse,
   RunConfigurationSaveResponse,
+  TelemetryConsentRequest,
+  TelemetryConsentSnapshot,
+  TelemetryConsentUpdatePayload,
+  TelemetryDeleteRequest,
+  TelemetryDeleteResponse,
+  TelemetryExportRequest,
+  TelemetryExportResponse,
   TelemetryHealthResponse,
   TelemetryRecord,
   TelemetryReplayRequest,
@@ -82,8 +95,34 @@ const api = {
   async telemetryGetHealth(): Promise<TelemetryHealthResponse> {
     return ipcRenderer.invoke('nexus:telemetry:health');
   },
+  async privacyGetConsent(payload: TelemetryConsentRequest = {}): Promise<TelemetryConsentSnapshot> {
+    return ipcRenderer.invoke('nexus:privacy:get-consent', payload);
+  },
+  async privacyUpdateConsent(payload: TelemetryConsentUpdatePayload): Promise<TelemetryConsentSnapshot> {
+    return ipcRenderer.invoke('nexus:privacy:update-consent', payload);
+  },
+  async privacyExportData(payload: TelemetryExportRequest = {}): Promise<TelemetryExportResponse> {
+    return ipcRenderer.invoke('nexus:privacy:export-data', payload);
+  },
+  async privacyDeleteData(payload: TelemetryDeleteRequest = {}): Promise<TelemetryDeleteResponse> {
+    return ipcRenderer.invoke('nexus:privacy:delete-data', payload);
+  },
   async featureFlagsList(): Promise<FeatureFlagSnapshot> {
     return ipcRenderer.invoke('nexus:feature-flags:list');
+  },
+  async aiControllerGetHealth(payload: LlamaControllerHealthRequest = {}): Promise<LlamaControllerHealthResponse> {
+    return ipcRenderer.invoke('nexus:ai:controller:health', payload);
+  },
+  async aiControllerStart(payload: LlamaControllerStartPayload): Promise<LlamaControllerHealthResponse> {
+    return ipcRenderer.invoke('nexus:ai:controller:start', payload);
+  },
+  async aiControllerStop(payload: LlamaControllerStopPayload = {}): Promise<LlamaControllerHealthResponse> {
+    return ipcRenderer.invoke('nexus:ai:controller:stop', payload);
+  },
+  async aiControllerBenchmark(
+    payload: LlamaControllerBenchmarkRequest = {}
+  ): Promise<LlamaControllerBenchmarkResponse> {
+    return ipcRenderer.invoke('nexus:ai:controller:benchmark', payload);
   },
   async openNewWindow() {
     return ipcRenderer.invoke('nexus:new-window');

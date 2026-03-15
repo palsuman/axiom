@@ -1,10 +1,10 @@
 module.exports = {
-  preset: '../../packages/configs/jest/jest.preset.cjs',
+  preset: '../configs/jest/jest.preset.cjs',
   rootDir: __dirname,
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>'],
   testMatch: ['**/*.spec.ts'],
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
-    '^@nexus/(.*)$': '<rootDir>/../../packages/$1'
+    '^@nexus/(.*)$': '<rootDir>/../$1'
   }
 };

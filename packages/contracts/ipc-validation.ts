@@ -1,4 +1,8 @@
 import type {
+  LlamaControllerBenchmarkRequest,
+  LlamaControllerHealthRequest,
+  LlamaControllerStartPayload,
+  LlamaControllerStopPayload,
   CopyEntriesPayload,
   CreateEntryPayload,
   DebugSessionStartPayload,
@@ -16,6 +20,10 @@ import type {
   OpenWorkspacePayload,
   RunConfigurationSavePayload,
   RenameEntryPayload,
+  TelemetryConsentRequest,
+  TelemetryConsentUpdatePayload,
+  TelemetryDeleteRequest,
+  TelemetryExportRequest,
   TerminalCreatePayload,
   TerminalDisposePayload,
   TerminalResizePayload,
@@ -89,6 +97,71 @@ const payloadValidators = {
       scope: readEnum(value, 'scope', TELEMETRY_SCOPES, { optional: true }),
       level: readEnum(value, 'level', TELEMETRY_LEVELS, { optional: true }),
       name: readString(value, 'name', { optional: true, allowEmpty: false })
+    };
+  },
+  'nexus:privacy:get-consent': (payload: unknown): TelemetryConsentRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      workspaceId: readString(value, 'workspaceId', { optional: true, allowEmpty: false })
+    };
+  },
+  'nexus:privacy:update-consent': (payload: unknown): TelemetryConsentUpdatePayload => {
+    const value = asObject(payload, 'payload');
+    const scope = readEnum(value, 'scope', ['user', 'workspace'] as const);
+    return {
+      scope,
+      workspaceId:
+        scope === 'workspace'
+          ? readString(value, 'workspaceId', { allowEmpty: false })
+          : readString(value, 'workspaceId', { optional: true, allowEmpty: false }),
+      preferences: readTelemetryConsentPreferences(value, 'preferences')
+    };
+  },
+  'nexus:privacy:export-data': (payload: unknown): TelemetryExportRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      workspaceId: readString(value, 'workspaceId', { optional: true, allowEmpty: false }),
+      mode: readEnum(value, 'mode', ['all', 'workspace'] as const, { optional: true })
+    };
+  },
+  'nexus:privacy:delete-data': (payload: unknown): TelemetryDeleteRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      deleteExports: readBoolean(value, 'deleteExports', { optional: true })
+    };
+  },
+  'nexus:ai:controller:health': (payload: unknown): LlamaControllerHealthRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      refresh: readBoolean(value, 'refresh', { optional: true })
+    };
+  },
+  'nexus:ai:controller:start': (payload: unknown): LlamaControllerStartPayload => {
+    const value = asObject(payload, 'payload');
+    return {
+      modelPath: readString(value, 'modelPath', { minLength: 1 }),
+      host: readString(value, 'host', { optional: true, allowEmpty: false }),
+      port: readInteger(value, 'port', { optional: true, min: 1, max: 65535 }),
+      threads: readInteger(value, 'threads', { optional: true, min: 1, max: 512 }),
+      contextSize: readInteger(value, 'contextSize', { optional: true, min: 256, max: 1048576 }),
+      batchSize: readInteger(value, 'batchSize', { optional: true, min: 1, max: 65535 }),
+      gpuPreference: readEnum(value, 'gpuPreference', ['auto', 'cpu', 'gpu'] as const, { optional: true }),
+      gpuLayers: readInteger(value, 'gpuLayers', { optional: true, min: 0, max: 999 }),
+      restartOnCrash: readBoolean(value, 'restartOnCrash', { optional: true }),
+      extraArgs: readStringArray(value, 'extraArgs', { optional: true })
+    };
+  },
+  'nexus:ai:controller:stop': (payload: unknown): LlamaControllerStopPayload => {
+    const value = asObject(payload, 'payload');
+    return {
+      force: readBoolean(value, 'force', { optional: true })
+    };
+  },
+  'nexus:ai:controller:benchmark': (payload: unknown): LlamaControllerBenchmarkRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      iterations: readInteger(value, 'iterations', { optional: true, min: 1, max: 100 }),
+      warmupIterations: readInteger(value, 'warmupIterations', { optional: true, min: 0, max: 20 })
     };
   },
   'nexus:open-workspace': (payload: unknown): OpenWorkspacePayload => {
@@ -768,6 +841,14 @@ function readTelemetryAttributeRecord(
     normalized[recordKey] = recordValue;
   });
   return normalized;
+}
+
+function readTelemetryConsentPreferences(value: Record<string, unknown>, key: string) {
+  const record = asObject(value[key], key);
+  return {
+    usageTelemetry: readBoolean(record, 'usageTelemetry'),
+    crashReports: readBoolean(record, 'crashReports')
+  };
 }
 
 export function isGitStatusValue(value: string | undefined) {

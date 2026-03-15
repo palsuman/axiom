@@ -13,6 +13,7 @@ type GlobalAliasState = typeof globalThis & {
 };
 
 const PREFIX_TO_PACKAGE = new Map<string, string>([
+  ['@nexus/ai-core/', 'ai-core'],
   ['@nexus/platform/', 'platform'],
   ['@nexus/contracts/', 'contracts'],
   ['@nexus/icons/', 'icons']

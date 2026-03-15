@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@nexus/ai-core/*": ["packages/ai-core/*"],
       "@nexus/platform/*": ["packages/platform/*"],
       "@nexus/contracts/*": ["packages/contracts/*"],
       "@nexus/icons/*": ["packages/icons/*"]

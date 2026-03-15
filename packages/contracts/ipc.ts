@@ -4,7 +4,15 @@ export type CoreChannel =
   | 'nexus:telemetry:track'
   | 'nexus:telemetry:replay'
   | 'nexus:telemetry:health'
+  | 'nexus:privacy:get-consent'
+  | 'nexus:privacy:update-consent'
+  | 'nexus:privacy:export-data'
+  | 'nexus:privacy:delete-data'
   | 'nexus:feature-flags:list'
+  | 'nexus:ai:controller:health'
+  | 'nexus:ai:controller:start'
+  | 'nexus:ai:controller:stop'
+  | 'nexus:ai:controller:benchmark'
   | 'nexus:new-window'
   | 'nexus:get-window-session'
   | 'nexus:open-workspace'
@@ -110,6 +118,72 @@ export type TelemetryHealthResponse = {
   scopes: Record<TelemetryScope, number>;
 };
 
+export type TelemetryConsentScope = 'user' | 'workspace';
+
+export type TelemetryConsentCategoryKey = 'usageTelemetry' | 'crashReports';
+
+export type TelemetryConsentPreferences = Record<TelemetryConsentCategoryKey, boolean>;
+
+export type TelemetryConsentSource = 'default' | 'persisted';
+
+export type TelemetryConsentCategoryDefinition = {
+  key: TelemetryConsentCategoryKey;
+  title: string;
+  description: string;
+};
+
+export type TelemetryConsentRecord = {
+  scope: TelemetryConsentScope;
+  workspaceId?: string;
+  source: TelemetryConsentSource;
+  updatedAt?: number;
+  preferences: TelemetryConsentPreferences;
+};
+
+export type TelemetryConsentSnapshot = {
+  workspaceId?: string;
+  categories: TelemetryConsentCategoryDefinition[];
+  user: TelemetryConsentRecord;
+  workspace?: TelemetryConsentRecord;
+  effective: TelemetryConsentRecord;
+  telemetry: TelemetryHealthResponse & {
+    collectionEnabled: boolean;
+  };
+};
+
+export type TelemetryConsentRequest = {
+  workspaceId?: string;
+};
+
+export type TelemetryConsentUpdatePayload = {
+  scope: TelemetryConsentScope;
+  workspaceId?: string;
+  preferences: TelemetryConsentPreferences;
+};
+
+export type TelemetryExportRequest = {
+  workspaceId?: string;
+  mode?: 'all' | 'workspace';
+};
+
+export type TelemetryExportResponse = {
+  path: string;
+  recordCount: number;
+  exportedAt: number;
+  mode: 'all' | 'workspace';
+  workspaceId?: string;
+};
+
+export type TelemetryDeleteRequest = {
+  deleteExports?: boolean;
+};
+
+export type TelemetryDeleteResponse = {
+  deleted: boolean;
+  clearedRecords: number;
+  bufferPath: string;
+};
+
 export type FeatureFlagStage = 'stable' | 'preview' | 'internal';
 
 export type FeatureFlagReason = 'default' | 'override' | 'rollout' | 'kill-switch';
@@ -137,6 +211,103 @@ export type FeatureFlagSnapshot = {
   configPath?: string;
   remoteUrl?: string;
   remoteLoadedAt?: number;
+};
+
+export type LlamaControllerStatus = 'stopped' | 'starting' | 'running' | 'degraded' | 'restarting' | 'crashed';
+
+export type LlamaGpuPreference = 'auto' | 'cpu' | 'gpu';
+
+export type LlamaControllerStartPayload = {
+  modelPath: string;
+  host?: string;
+  port?: number;
+  threads?: number;
+  contextSize?: number;
+  batchSize?: number;
+  gpuPreference?: LlamaGpuPreference;
+  gpuLayers?: number;
+  restartOnCrash?: boolean;
+  extraArgs?: string[];
+};
+
+export type LlamaControllerStopPayload = {
+  force?: boolean;
+};
+
+export type LlamaControllerHealthRequest = {
+  refresh?: boolean;
+};
+
+export type LlamaControllerProcessState = {
+  pid?: number;
+  startedAt?: number;
+  restarts: number;
+  restartOnCrash: boolean;
+  lastExitCode?: number;
+  lastExitSignal?: string;
+  lastExitAt?: number;
+};
+
+export type LlamaControllerHealthResult = {
+  ok: boolean;
+  checkedAt: number;
+  latencyMs?: number;
+  statusCode?: number;
+  error?: string;
+};
+
+export type LlamaControllerHealthResponse = {
+  status: LlamaControllerStatus;
+  installRoot: string;
+  binaryPath?: string;
+  installed: boolean;
+  endpoint: string;
+  host: string;
+  port: number;
+  modelPath?: string;
+  process: LlamaControllerProcessState;
+  health: LlamaControllerHealthResult;
+  configuration?: {
+    threads?: number;
+    contextSize?: number;
+    batchSize?: number;
+    gpuPreference: LlamaGpuPreference;
+    gpuLayers?: number;
+    extraArgs: string[];
+  };
+  recentOutput: string[];
+};
+
+export type LlamaControllerBenchmarkRequest = {
+  iterations?: number;
+  warmupIterations?: number;
+};
+
+export type LlamaControllerBenchmarkSample = {
+  iteration: number;
+  ok: boolean;
+  checkedAt: number;
+  latencyMs?: number;
+  statusCode?: number;
+  error?: string;
+};
+
+export type LlamaControllerBenchmarkSummary = {
+  successes: number;
+  failures: number;
+  minLatencyMs?: number;
+  maxLatencyMs?: number;
+  avgLatencyMs?: number;
+  p50LatencyMs?: number;
+  p95LatencyMs?: number;
+};
+
+export type LlamaControllerBenchmarkResponse = {
+  iterations: number;
+  warmupIterations: number;
+  endpoint: string;
+  samples: LlamaControllerBenchmarkSample[];
+  summary: LlamaControllerBenchmarkSummary;
 };
 
 export type WindowSessionMetadata = {

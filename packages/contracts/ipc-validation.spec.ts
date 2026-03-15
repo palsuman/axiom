@@ -84,6 +84,43 @@ describe('ipc-validation', () => {
     });
   });
 
+  it('validates llama.cpp controller start payloads', () => {
+    const payload = validateIpcPayload('nexus:ai:controller:start', {
+      modelPath: '/models/coder.gguf',
+      host: '127.0.0.1',
+      port: 39281,
+      threads: 8,
+      contextSize: 8192,
+      batchSize: 256,
+      gpuPreference: 'gpu',
+      gpuLayers: 20,
+      restartOnCrash: true,
+      extraArgs: ['--verbose']
+    });
+
+    expect(payload).toEqual({
+      modelPath: '/models/coder.gguf',
+      host: '127.0.0.1',
+      port: 39281,
+      threads: 8,
+      contextSize: 8192,
+      batchSize: 256,
+      gpuPreference: 'gpu',
+      gpuLayers: 20,
+      restartOnCrash: true,
+      extraArgs: ['--verbose']
+    });
+  });
+
+  it('rejects malformed llama.cpp controller benchmark payloads', () => {
+    expect(() =>
+      validateIpcPayload('nexus:ai:controller:benchmark', {
+        iterations: 0,
+        warmupIterations: -1
+      })
+    ).toThrow(IpcValidationError);
+  });
+
   it('rejects invalid telemetry attributes', () => {
     expect(() =>
       validateIpcPayload('nexus:telemetry:track', {
@@ -179,5 +216,34 @@ describe('ipc-validation', () => {
       expression: 'process.pid',
       context: 'watch'
     });
+  });
+
+  it('validates privacy consent update payloads', () => {
+    const payload = validateIpcPayload('nexus:privacy:update-consent', {
+      scope: 'workspace',
+      workspaceId: 'workspace-1',
+      preferences: {
+        usageTelemetry: false,
+        crashReports: true
+      }
+    });
+
+    expect(payload).toEqual({
+      scope: 'workspace',
+      workspaceId: 'workspace-1',
+      preferences: {
+        usageTelemetry: false,
+        crashReports: true
+      }
+    });
+  });
+
+  it('rejects malformed privacy export payloads', () => {
+    expect(() =>
+      validateIpcPayload('nexus:privacy:export-data', {
+        workspaceId: '',
+        mode: 'everything'
+      })
+    ).toThrow(IpcValidationError);
   });
 });

@@ -11,6 +11,7 @@ const contributionBindings = registerWorkbenchContributions({
   gitStatusStore: context.gitStatusStore,
   i18nService: context.i18nService,
   settingsEditorService: context.settingsEditorService,
+  privacyCenterService: context.privacyCenterService,
   launchConfigurationEditorService: context.launchConfigurationEditorService
 });
 registerWorkbenchCommands(context);
@@ -31,6 +32,7 @@ const gitStatusStore = context.gitStatusStore;
 const debugSessionStore = context.debugSessionStore;
 const settingsService = context.settingsService;
 const settingsEditorService = context.settingsEditorService;
+const privacyCenterService = context.privacyCenterService;
 const launchConfigurationEditorService = context.launchConfigurationEditorService;
 const i18nService = context.i18nService;
 
@@ -46,6 +48,7 @@ export {
   debugSessionStore,
   settingsService,
   settingsEditorService,
+  privacyCenterService,
   launchConfigurationEditorService,
   i18nService
 };

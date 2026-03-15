@@ -190,6 +190,74 @@ jest.mock('./system/telemetry-service', () => {
   };
 });
 
+jest.mock('./system/privacy-service', () => {
+  const state = {
+    getSnapshot: jest.fn(() => ({
+      workspaceId: 'workspace-1',
+      categories: [
+        {
+          key: 'usageTelemetry',
+          title: 'Usage & diagnostics telemetry',
+          description: 'Collect local diagnostics and usage events.'
+        },
+        {
+          key: 'crashReports',
+          title: 'Crash report sharing',
+          description: 'Allow crash report sending.'
+        }
+      ],
+      user: {
+        scope: 'user',
+        source: 'default',
+        preferences: {
+          usageTelemetry: true,
+          crashReports: false
+        }
+      },
+      workspace: {
+        scope: 'workspace',
+        workspaceId: 'workspace-1',
+        source: 'default',
+        preferences: {
+          usageTelemetry: true,
+          crashReports: false
+        }
+      },
+      effective: {
+        scope: 'workspace',
+        workspaceId: 'workspace-1',
+        source: 'default',
+        preferences: {
+          usageTelemetry: true,
+          crashReports: false
+        }
+      },
+      telemetry: {
+        bufferPath: '/tmp/telemetry/events.jsonl',
+        eventCount: 0,
+        fileBytes: 0,
+        dropped: 0,
+        lastSequence: 0,
+        oldestRecordedAt: undefined,
+        newestRecordedAt: undefined,
+        levels: { error: 0, warn: 0, info: 0, debug: 0 },
+        scopes: { main: 0, renderer: 0, preload: 0, shared: 0 },
+        collectionEnabled: true
+      }
+    })),
+    updateConsent: jest.fn(),
+    exportData: jest.fn(),
+    deleteData: jest.fn(),
+    isTelemetryEnabled: jest.fn(() => true),
+    canShareCrashReports: jest.fn(() => true)
+  };
+
+  return {
+    __mock: state,
+    PrivacyService: jest.fn().mockImplementation(() => state)
+  };
+});
+
 jest.mock('./system/feature-flag-service', () => {
   const state = {
     initialize: jest.fn(() => ({
@@ -223,6 +291,46 @@ jest.mock('./system/feature-flag-service', () => {
   return {
     __mock: state,
     FeatureFlagService: jest.fn().mockImplementation(() => state)
+  };
+});
+
+jest.mock('./ai/llama-controller-service', () => {
+  const state = {
+    getHealth: jest.fn().mockResolvedValue({
+      status: 'stopped',
+      installRoot: '/tmp/.nexus/ai/llama.cpp',
+      installed: false,
+      endpoint: 'http://127.0.0.1:39281/health',
+      host: '127.0.0.1',
+      port: 39281,
+      process: {
+        restarts: 0,
+        restartOnCrash: true
+      },
+      health: {
+        ok: false,
+        checkedAt: Date.now(),
+        error: 'controller not started'
+      },
+      recentOutput: []
+    }),
+    start: jest.fn(),
+    stop: jest.fn(),
+    benchmark: jest.fn().mockResolvedValue({
+      iterations: 3,
+      warmupIterations: 1,
+      endpoint: 'http://127.0.0.1:39281/health',
+      samples: [],
+      summary: {
+        successes: 0,
+        failures: 3
+      }
+    })
+  };
+
+  return {
+    __mock: state,
+    LlamaControllerService: jest.fn().mockImplementation(() => state)
   };
 });
 
@@ -393,7 +501,15 @@ describe('desktop shell main process', () => {
     expect(typeof electron.getHandle('nexus:telemetry:track')).toBe('function');
     expect(typeof electron.getHandle('nexus:telemetry:replay')).toBe('function');
     expect(typeof electron.getHandle('nexus:telemetry:health')).toBe('function');
+    expect(typeof electron.getHandle('nexus:privacy:get-consent')).toBe('function');
+    expect(typeof electron.getHandle('nexus:privacy:update-consent')).toBe('function');
+    expect(typeof electron.getHandle('nexus:privacy:export-data')).toBe('function');
+    expect(typeof electron.getHandle('nexus:privacy:delete-data')).toBe('function');
     expect(typeof electron.getHandle('nexus:feature-flags:list')).toBe('function');
+    expect(typeof electron.getHandle('nexus:ai:controller:health')).toBe('function');
+    expect(typeof electron.getHandle('nexus:ai:controller:start')).toBe('function');
+    expect(typeof electron.getHandle('nexus:ai:controller:stop')).toBe('function');
+    expect(typeof electron.getHandle('nexus:ai:controller:benchmark')).toBe('function');
     expect(typeof electron.getOn('nexus:log')).toBe('function');
   });
 
@@ -510,6 +626,81 @@ describe('desktop shell main process', () => {
     handler({});
 
     expect(featureFlags.__mock.list).toHaveBeenCalled();
+  });
+
+  it('routes AI controller IPC calls through the llama controller service', async () => {
+    const controller = jest.requireMock('./ai/llama-controller-service') as {
+      __mock: {
+        getHealth: jest.Mock;
+        start: jest.Mock;
+        stop: jest.Mock;
+        benchmark: jest.Mock;
+      };
+    };
+
+    electron.getHandle('nexus:ai:controller:health')({}, { refresh: true });
+    electron.getHandle('nexus:ai:controller:start')({}, { modelPath: '/models/coder.gguf', gpuPreference: 'cpu' });
+    electron.getHandle('nexus:ai:controller:stop')({}, { force: true });
+    electron.getHandle('nexus:ai:controller:benchmark')({}, { iterations: 4 });
+
+    expect(controller.__mock.getHealth).toHaveBeenCalledWith({ refresh: true });
+    expect(controller.__mock.start).toHaveBeenCalledWith({
+      modelPath: '/models/coder.gguf',
+      host: undefined,
+      port: undefined,
+      threads: undefined,
+      contextSize: undefined,
+      batchSize: undefined,
+      gpuPreference: 'cpu',
+      gpuLayers: undefined,
+      restartOnCrash: undefined,
+      extraArgs: undefined
+    });
+    expect(controller.__mock.stop).toHaveBeenCalledWith({ force: true });
+    expect(controller.__mock.benchmark).toHaveBeenCalledWith({ iterations: 4, warmupIterations: undefined });
+  });
+
+  it('routes privacy IPC calls through the privacy service', async () => {
+    const privacy = jest.requireMock('./system/privacy-service') as {
+      __mock: {
+        getSnapshot: jest.Mock;
+        updateConsent: jest.Mock;
+        exportData: jest.Mock;
+        deleteData: jest.Mock;
+      };
+    };
+
+    const getHandler = electron.getHandle('nexus:privacy:get-consent');
+    const updateHandler = electron.getHandle('nexus:privacy:update-consent');
+    const exportHandler = electron.getHandle('nexus:privacy:export-data');
+    const deleteHandler = electron.getHandle('nexus:privacy:delete-data');
+
+    getHandler({}, { workspaceId: 'workspace-1' });
+    updateHandler({}, {
+      scope: 'workspace',
+      workspaceId: 'workspace-1',
+      preferences: {
+        usageTelemetry: false,
+        crashReports: true
+      }
+    });
+    exportHandler({}, { workspaceId: 'workspace-1', mode: 'workspace' });
+    deleteHandler({}, { deleteExports: true });
+
+    expect(privacy.__mock.getSnapshot).toHaveBeenCalledWith('workspace-1');
+    expect(privacy.__mock.updateConsent).toHaveBeenCalledWith({
+      scope: 'workspace',
+      workspaceId: 'workspace-1',
+      preferences: {
+        usageTelemetry: false,
+        crashReports: true
+      }
+    });
+    expect(privacy.__mock.exportData).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      mode: 'workspace'
+    });
+    expect(privacy.__mock.deleteData).toHaveBeenCalledWith({ deleteExports: true });
   });
 });
 

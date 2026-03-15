@@ -11,6 +11,12 @@ import type {
   DeleteEntriesPayload,
   FsOperationResponse,
   FeatureFlagSnapshot,
+  LlamaControllerBenchmarkRequest,
+  LlamaControllerBenchmarkResponse,
+  LlamaControllerHealthRequest,
+  LlamaControllerHealthResponse,
+  LlamaControllerStartPayload,
+  LlamaControllerStopPayload,
   GitCommitPayload,
   GitCommitResult,
   GitDiffRequest,
@@ -28,6 +34,13 @@ import type {
   RenameEntryPayload,
   RunConfigurationLoadResponse,
   RunConfigurationSaveResponse,
+  TelemetryConsentRequest,
+  TelemetryConsentSnapshot,
+  TelemetryConsentUpdatePayload,
+  TelemetryDeleteRequest,
+  TelemetryDeleteResponse,
+  TelemetryExportRequest,
+  TelemetryExportResponse,
   TelemetryHealthResponse,
   TelemetryRecord,
   TelemetryReplayRequest,
@@ -50,7 +63,15 @@ type NexusBridge = {
   telemetryTrack(payload: TelemetryTrackPayload): Promise<TelemetryRecord>;
   telemetryReplay(payload?: TelemetryReplayRequest): Promise<TelemetryReplayResponse>;
   telemetryGetHealth(): Promise<TelemetryHealthResponse>;
+  privacyGetConsent(payload?: TelemetryConsentRequest): Promise<TelemetryConsentSnapshot>;
+  privacyUpdateConsent(payload: TelemetryConsentUpdatePayload): Promise<TelemetryConsentSnapshot>;
+  privacyExportData(payload?: TelemetryExportRequest): Promise<TelemetryExportResponse>;
+  privacyDeleteData(payload?: TelemetryDeleteRequest): Promise<TelemetryDeleteResponse>;
   featureFlagsList(): Promise<FeatureFlagSnapshot>;
+  aiControllerGetHealth(payload?: LlamaControllerHealthRequest): Promise<LlamaControllerHealthResponse>;
+  aiControllerStart(payload: LlamaControllerStartPayload): Promise<LlamaControllerHealthResponse>;
+  aiControllerStop(payload?: LlamaControllerStopPayload): Promise<LlamaControllerHealthResponse>;
+  aiControllerBenchmark(payload?: LlamaControllerBenchmarkRequest): Promise<LlamaControllerBenchmarkResponse>;
   fsCreateEntry(payload: CreateEntryPayload): Promise<FsOperationResponse>;
   fsRenameEntry(payload: RenameEntryPayload): Promise<FsOperationResponse>;
   fsMoveEntries(payload: MoveEntriesPayload): Promise<FsOperationResponse>;

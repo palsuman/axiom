@@ -22,6 +22,11 @@ export type NexusEnv = {
   featureFlagsFile: string;
   featureFlagsUrl?: string;
   featureFlags?: string;
+  llamaCppRootDir: string;
+  llamaCppBinaryPath?: string;
+  llamaCppHost: string;
+  llamaCppPort: number;
+  llamaCppHealthTimeoutMs: number;
 };
 
 function getEnumEnv<T extends readonly string[]>(key: string, allowed: T, fallback: T[number]): T[number] {
@@ -83,6 +88,17 @@ function normalizeUrl(key: string, value: string | undefined) {
   }
 }
 
+function normalizeHost(value: string | undefined) {
+  if (!value || !value.trim()) {
+    return '127.0.0.1';
+  }
+  const normalized = value.trim();
+  if (!/^[A-Za-z0-9.\-:]+$/.test(normalized)) {
+    throw new Error(`Invalid NEXUS_LLAMACPP_HOST: ${value}`);
+  }
+  return normalized;
+}
+
 export function readEnv(): NexusEnv {
   const nexusEnv = getEnumEnv('NEXUS_ENV', VALID_ENVS, 'development');
   const logLevel = getEnumEnv('LOG_LEVEL', VALID_LOG_LEVELS, 'info');
@@ -103,6 +119,13 @@ export function readEnv(): NexusEnv {
   );
   const featureFlagsUrl = normalizeUrl('NEXUS_FEATURE_FLAGS_URL', process.env.NEXUS_FEATURE_FLAGS_URL);
   const featureFlags = process.env.NEXUS_FEATURE_FLAGS?.trim() || undefined;
+  const llamaCppRootDir = resolveDir(process.env.NEXUS_LLAMACPP_ROOT, path.join(nexusDataDir, 'ai', 'llama.cpp'));
+  const llamaCppBinaryPath = process.env.NEXUS_LLAMACPP_BINARY
+    ? toAbsolutePath(process.env.NEXUS_LLAMACPP_BINARY.trim())
+    : undefined;
+  const llamaCppHost = normalizeHost(process.env.NEXUS_LLAMACPP_HOST);
+  const llamaCppPort = getPositiveIntEnv('NEXUS_LLAMACPP_PORT', 39281);
+  const llamaCppHealthTimeoutMs = getPositiveIntEnv('NEXUS_LLAMACPP_HEALTH_TIMEOUT_MS', 3000);
   return {
     nexusEnv,
     logLevel,
@@ -118,6 +141,11 @@ export function readEnv(): NexusEnv {
     crashReportingTimeoutMs,
     featureFlagsFile,
     featureFlagsUrl,
-    featureFlags
+    featureFlags,
+    llamaCppRootDir,
+    llamaCppBinaryPath,
+    llamaCppHost,
+    llamaCppPort,
+    llamaCppHealthTimeoutMs
   };
 }

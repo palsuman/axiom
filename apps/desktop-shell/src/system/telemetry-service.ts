@@ -17,14 +17,19 @@ type TelemetryServiceOptions = {
     list: () => FeatureFlagSnapshot;
     getTelemetrySummary: () => string;
   };
+  privacy?: {
+    isTelemetryEnabled: (workspaceId?: string) => boolean;
+  };
 };
 
 export class TelemetryService {
   private readonly store: TelemetryStore;
   private readonly featureFlags?: NonNullable<TelemetryServiceOptions['featureFlags']>;
+  private readonly privacy?: NonNullable<TelemetryServiceOptions['privacy']>;
 
   constructor(env: NexusEnv, options: TelemetryServiceOptions = {}) {
     this.featureFlags = options.featureFlags;
+    this.privacy = options.privacy;
     this.store =
       options.store ??
       new TelemetryStore({
@@ -34,7 +39,7 @@ export class TelemetryService {
 
   track(payload: TelemetryTrackPayload): TelemetryRecord {
     const featureFlagSummary = this.featureFlags?.getTelemetrySummary();
-    return this.store.track({
+    const normalizedPayload = {
       ...payload,
       attributes: featureFlagSummary
         ? {
@@ -43,7 +48,11 @@ export class TelemetryService {
           }
         : payload.attributes,
       tags: this.mergeTags(payload.tags)
-    });
+    };
+    if (this.privacy && !this.privacy.isTelemetryEnabled(payload.workspaceId)) {
+      return this.store.preview(normalizedPayload);
+    }
+    return this.store.track(normalizedPayload);
   }
 
   trackRendererLog(payload: LogPayload, context: { sessionId?: string; workspaceId?: string } = {}) {

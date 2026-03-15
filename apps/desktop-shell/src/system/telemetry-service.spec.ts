@@ -46,4 +46,24 @@ describe('TelemetryService', () => {
     expect(health.eventCount).toBe(1);
     expect(health.scopes.renderer).toBe(1);
   });
+
+  it('returns best-effort records without persisting when telemetry consent is disabled', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-telemetry-service-disabled-'));
+    const env = createMockEnv({ nexusDataDir: tempDir });
+    const service = new TelemetryService(env, {
+      privacy: {
+        isTelemetryEnabled: () => false
+      }
+    });
+
+    const record = service.track({
+      name: 'desktop.blocked',
+      scope: 'main',
+      workspaceId: 'workspace-1'
+    });
+
+    expect(record.name).toBe('desktop.blocked');
+    expect(service.replay({ limit: 10 }).records).toHaveLength(0);
+    expect(service.getHealth().eventCount).toBe(0);
+  });
 });

@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { app, ipcMain, BrowserWindow, webContents } from 'electron';
 import { readEnv } from '@nexus/platform/config/env';
 import { WindowStateStore } from '@nexus/platform/windowing/window-state';
@@ -11,6 +12,8 @@ import { WorkspaceHistoryStore } from '@nexus/platform/workspace/workspace-histo
 import { ensureStorageLayout } from '@nexus/platform/workspace/storage-layout';
 import { loadWorkspaceDescriptor } from '@nexus/platform/workspace/workspace-descriptor';
 import { WorkspaceBackupManager } from '@nexus/platform/workspace/workspace-backup';
+import { TelemetryStore } from '@nexus/platform/observability/telemetry-store';
+import { LlamaControllerService } from '../ai/llama-controller-service';
 import { FileOperationsService } from '../filesystem/file-operations';
 import { DebugAdapterHostService } from '../run-debug/debug-adapter-host-service';
 import { LaunchConfigurationService } from '../run-debug/launch-configuration-service';
@@ -20,6 +23,7 @@ import { CrashReporter } from '../system/crash-reporting';
 import { CrashService } from '../system/crash-service';
 import { FeatureFlagService } from '../system/feature-flag-service';
 import { log, logError } from '../system/logger';
+import { PrivacyService } from '../system/privacy-service';
 import { StartupMetrics } from '../system/startup-metrics';
 import { TelemetryService } from '../system/telemetry-service';
 import { UpdateService } from '../system/update-service';
@@ -47,17 +51,29 @@ const associationService = new AssociationService(env);
 const updateService = new UpdateService(env);
 const featureFlagService = new FeatureFlagService(env);
 featureFlagService.initialize();
+const telemetryStore = new TelemetryStore({
+  bufferPath: path.join(env.nexusDataDir ?? env.nexusHome, 'telemetry', 'events.jsonl')
+});
+const privacyService = new PrivacyService(env, {
+  telemetryStore
+});
 const telemetryService = new TelemetryService(env, {
-  featureFlags: featureFlagService
+  featureFlags: featureFlagService,
+  privacy: privacyService,
+  store: telemetryStore
 });
 const crashReporter = new CrashReporter(env, {
   telemetry: telemetryService,
-  featureFlags: featureFlagService
+  featureFlags: featureFlagService,
+  privacy: privacyService
 });
 const crashService = new CrashService(env, windowManager, {
   reporter: crashReporter
 });
 const startupMetrics = new StartupMetrics(env, undefined, telemetryService);
+const llamaControllerService = new LlamaControllerService(env, {
+  telemetry: telemetryService
+});
 const workspaceHistory = new WorkspaceHistoryStore({
   historyDir: env.workspaceDataDir
 });
@@ -123,7 +139,35 @@ function registerIpcHandlers() {
     telemetryService.replay(payload === undefined ? {} : requireValidPayload('nexus:telemetry:replay', payload))
   );
   ipcMain.handle('nexus:telemetry:health', () => telemetryService.getHealth());
+  ipcMain.handle('nexus:privacy:get-consent', (_event, payload) =>
+    privacyService.getSnapshot(
+      (payload === undefined ? {} : requireValidPayload('nexus:privacy:get-consent', payload)).workspaceId
+    )
+  );
+  ipcMain.handle('nexus:privacy:update-consent', (_event, payload) =>
+    privacyService.updateConsent(requireValidPayload('nexus:privacy:update-consent', payload))
+  );
+  ipcMain.handle('nexus:privacy:export-data', (_event, payload) =>
+    privacyService.exportData(payload === undefined ? {} : requireValidPayload('nexus:privacy:export-data', payload))
+  );
+  ipcMain.handle('nexus:privacy:delete-data', (_event, payload) =>
+    privacyService.deleteData(payload === undefined ? {} : requireValidPayload('nexus:privacy:delete-data', payload))
+  );
   ipcMain.handle('nexus:feature-flags:list', () => featureFlagService.list());
+  ipcMain.handle('nexus:ai:controller:health', (_event, payload) =>
+    llamaControllerService.getHealth(payload === undefined ? {} : requireValidPayload('nexus:ai:controller:health', payload))
+  );
+  ipcMain.handle('nexus:ai:controller:start', (_event, payload) =>
+    llamaControllerService.start(requireValidPayload('nexus:ai:controller:start', payload))
+  );
+  ipcMain.handle('nexus:ai:controller:stop', (_event, payload) =>
+    llamaControllerService.stop(payload === undefined ? {} : requireValidPayload('nexus:ai:controller:stop', payload))
+  );
+  ipcMain.handle('nexus:ai:controller:benchmark', (_event, payload) =>
+    llamaControllerService.benchmark(
+      payload === undefined ? {} : requireValidPayload('nexus:ai:controller:benchmark', payload)
+    )
+  );
 
   ipcMain.handle('nexus:new-window', () => {
     windowManager.createWindow();

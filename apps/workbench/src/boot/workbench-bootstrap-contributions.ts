@@ -6,6 +6,7 @@ import { DEFAULT_ACTIVITY_ITEMS, type WorkbenchShell } from '../shell/workbench-
 import type { CommandPaletteService } from '../commands/command-palette';
 import type { SettingsEditorService } from '../settings/settings-editor-service';
 import type { LaunchConfigurationEditorService } from '../run-debug/launch-configuration-editor-service';
+import type { PrivacyCenterService } from '../observability/privacy-center-service';
 import type { WorkspaceService } from '../workspace/workspace-service';
 import type { GitStatusStore } from '../scm/git-status-store';
 
@@ -21,6 +22,7 @@ export function registerWorkbenchContributions(options: {
   gitStatusStore: GitStatusStore;
   i18nService: I18nService;
   settingsEditorService: SettingsEditorService;
+  privacyCenterService: PrivacyCenterService;
   launchConfigurationEditorService: LaunchConfigurationEditorService;
 }): WorkbenchContributionBindings {
   registerWorkbenchStructure(options.shell);
@@ -29,6 +31,7 @@ export function registerWorkbenchContributions(options: {
     options.workspaceService,
     options.i18nService,
     options.settingsEditorService,
+    options.privacyCenterService,
     options.launchConfigurationEditorService
   );
   options.shell.registerStatusItem({ id: 'status.encoding', alignment: 'right', text: 'UTF-8', priority: 5 });
@@ -115,8 +118,10 @@ function registerQuickOpenProviders(
   workspaceService: WorkspaceService,
   i18nService: I18nService,
   settingsEditorService: SettingsEditorService,
+  privacyCenterService: PrivacyCenterService,
   launchConfigurationEditorService: LaunchConfigurationEditorService
 ) {
+  void privacyCenterService;
   commandPalette.registerProvider({
     id: 'recent-workspaces',
     getItems: query => {
@@ -268,6 +273,16 @@ function registerQuickOpenProviders(
       const normalizedQuery = query.trim().toLowerCase();
       const keywordScore = normalizedQuery ? fuzzyScore(normalizedQuery, 'settings preferences') : 0.05;
       const actionItems = [
+        {
+          id: 'settings:privacy:center',
+          type: 'custom' as const,
+          label: 'Open Privacy Center',
+          detail: 'Preferences',
+          score: normalizedQuery ? Math.max(keywordScore, fuzzyScore(normalizedQuery, 'privacy telemetry consent')) : 0.185,
+          source: 'settings-action',
+          commandId: 'nexus.privacy.center.open',
+          metadata: {}
+        },
         {
           id: 'settings:user:form',
           type: 'custom' as const,

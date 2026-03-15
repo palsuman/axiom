@@ -12,6 +12,7 @@ import { SettingsEditorService } from '../settings/settings-editor-service';
 import { SettingsService } from '../settings/settings-service';
 import { DebugSessionStore } from '../run-debug/debug-session-store';
 import { LaunchConfigurationEditorService } from '../run-debug/launch-configuration-editor-service';
+import { PrivacyCenterService } from '../observability/privacy-center-service';
 import { WorkspaceHotExitService } from '../workspace/workspace-hot-exit-service';
 import type { ThemeRuntime } from '@nexus/platform/theming/theme-runtime';
 
@@ -35,6 +36,7 @@ export type WorkbenchBootstrapContext = {
   gitHistoryStore: GitHistoryStore;
   settingsService: SettingsService;
   settingsEditorService: SettingsEditorService;
+  privacyCenterService: PrivacyCenterService;
   debugSessionStore: DebugSessionStore;
   launchConfigurationEditorService: LaunchConfigurationEditorService;
   themeRuntime: ThemeRuntime;
@@ -70,6 +72,11 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     settingsService,
     shell
   });
+  const privacyCenterService = new PrivacyCenterService({
+    shell,
+    bridge: workspaceBridge,
+    workspaceId: workspaceIdentity
+  });
   const debugSessionStore = new DebugSessionStore({
     bridge: workspaceBridge,
     workspaceId: workspaceIdentity,
@@ -99,6 +106,7 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     gitHistoryStore,
     settingsService,
     settingsEditorService,
+    privacyCenterService,
     debugSessionStore,
     launchConfigurationEditorService,
     themeRuntime

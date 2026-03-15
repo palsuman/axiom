@@ -35,6 +35,11 @@ describe('readEnv', () => {
     expect(env.featureFlagsFile).toBe(path.join(env.nexusDataDir, 'config', 'feature-flags.json'));
     expect(env.featureFlagsUrl).toBeUndefined();
     expect(env.featureFlags).toBeUndefined();
+    expect(env.llamaCppRootDir).toBe(path.join(env.nexusDataDir, 'ai', 'llama.cpp'));
+    expect(env.llamaCppBinaryPath).toBeUndefined();
+    expect(env.llamaCppHost).toBe('127.0.0.1');
+    expect(env.llamaCppPort).toBe(39281);
+    expect(env.llamaCppHealthTimeoutMs).toBe(3000);
   });
 
   it('throws on invalid NEXUS_ENV', () => {
@@ -56,6 +61,11 @@ describe('readEnv', () => {
     process.env.NEXUS_FEATURE_FLAGS_FILE = './flags.json';
     process.env.NEXUS_FEATURE_FLAGS_URL = 'https://ops.example.com/flags.json';
     process.env.NEXUS_FEATURE_FLAGS = 'observability.healthDiagnostics=true';
+    process.env.NEXUS_LLAMACPP_ROOT = './runtime/llama.cpp';
+    process.env.NEXUS_LLAMACPP_BINARY = './runtime/llama.cpp/build/bin/llama-server';
+    process.env.NEXUS_LLAMACPP_HOST = '0.0.0.0';
+    process.env.NEXUS_LLAMACPP_PORT = '8080';
+    process.env.NEXUS_LLAMACPP_HEALTH_TIMEOUT_MS = '4500';
     const env = readEnv();
     expect(env.nexusHome).toBe(path.resolve('/tmp/nexus-home'));
     expect(env.nexusDataDir).toBe(path.join(os.homedir(), 'nexus-data'));
@@ -66,6 +76,11 @@ describe('readEnv', () => {
     expect(env.featureFlagsFile).toBe(path.join(os.homedir(), 'flags.json'));
     expect(env.featureFlagsUrl).toBe('https://ops.example.com/flags.json');
     expect(env.featureFlags).toBe('observability.healthDiagnostics=true');
+    expect(env.llamaCppRootDir).toBe(path.join(os.homedir(), 'runtime/llama.cpp'));
+    expect(env.llamaCppBinaryPath).toBe(path.join(os.homedir(), 'runtime/llama.cpp/build/bin/llama-server'));
+    expect(env.llamaCppHost).toBe('0.0.0.0');
+    expect(env.llamaCppPort).toBe(8080);
+    expect(env.llamaCppHealthTimeoutMs).toBe(4500);
   });
 
   it('rejects invalid locale values', () => {
@@ -92,5 +107,17 @@ describe('readEnv', () => {
     process.env.NEXUS_CRASH_REPORTING_TIMEOUT_MS = '5000';
     process.env.NEXUS_FEATURE_FLAGS_URL = 'not a url';
     expect(() => readEnv()).toThrow(/Invalid NEXUS_FEATURE_FLAGS_URL/);
+
+    process.env.NEXUS_FEATURE_FLAGS_URL = 'https://ops.example.com/flags.json';
+    process.env.NEXUS_LLAMACPP_HOST = 'host name with spaces';
+    expect(() => readEnv()).toThrow(/Invalid NEXUS_LLAMACPP_HOST/);
+
+    process.env.NEXUS_LLAMACPP_HOST = '127.0.0.1';
+    process.env.NEXUS_LLAMACPP_PORT = '0';
+    expect(() => readEnv()).toThrow(/Invalid NEXUS_LLAMACPP_PORT/);
+
+    process.env.NEXUS_LLAMACPP_PORT = '39281';
+    process.env.NEXUS_LLAMACPP_HEALTH_TIMEOUT_MS = '0';
+    expect(() => readEnv()).toThrow(/Invalid NEXUS_LLAMACPP_HEALTH_TIMEOUT_MS/);
   });
 });

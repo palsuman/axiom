@@ -1,0 +1,19 @@
+{
+  "name": "ai-core",
+  "projectType": "library",
+  "sourceRoot": "packages/ai-core",
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config packages/ai-core/jest.config.cjs --runInBand"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint packages/ai-core --ext .ts"
+      }
+    }
+  }
+}

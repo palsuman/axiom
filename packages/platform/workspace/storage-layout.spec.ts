@@ -67,6 +67,11 @@ function buildEnv(homeDir: string): NexusEnv {
     crashReportingTimeoutMs: 5000,
     featureFlagsFile: path.join(homeDir, 'config', 'feature-flags.json'),
     featureFlagsUrl: undefined,
-    featureFlags: undefined
+    featureFlags: undefined,
+    llamaCppRootDir: path.join(homeDir, 'ai', 'llama.cpp'),
+    llamaCppBinaryPath: undefined,
+    llamaCppHost: '127.0.0.1',
+    llamaCppPort: 39281,
+    llamaCppHealthTimeoutMs: 3000
   };
 }

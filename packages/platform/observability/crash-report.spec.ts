@@ -20,7 +20,12 @@ describe('crash-report', () => {
       crashReportingTimeoutMs: 5000,
       featureFlagsFile: path.join(home, '.nexus', 'config', 'feature-flags.json'),
       featureFlagsUrl: undefined,
-      featureFlags: undefined
+      featureFlags: undefined,
+      llamaCppRootDir: path.join(home, '.nexus', 'ai', 'llama.cpp'),
+      llamaCppBinaryPath: undefined,
+      llamaCppHost: '127.0.0.1',
+      llamaCppPort: 39281,
+      llamaCppHealthTimeoutMs: 3000
     } as const;
     const error = new Error(`Failed while reading ${path.join(home, 'workspace', 'app.ts')}`);
     error.stack = `Error: ${error.message}\n    at ${path.join(home, 'workspace', 'app.ts')}:10:5`;

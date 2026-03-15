@@ -54,6 +54,71 @@ function createNexusBridge() {
       levels: { error: 0, warn: 0, info: 0, debug: 0 },
       scopes: { main: 0, renderer: 0, preload: 0, shared: 0 }
     }),
+    privacyGetConsent: jest.fn().mockResolvedValue({
+      workspaceId: 'spec-workspace',
+      categories: [
+        {
+          key: 'usageTelemetry',
+          title: 'Usage & diagnostics telemetry',
+          description: 'Collect local diagnostics and usage events.'
+        },
+        {
+          key: 'crashReports',
+          title: 'Crash report sharing',
+          description: 'Allow crash report sending.'
+        }
+      ],
+      user: {
+        scope: 'user',
+        source: 'default',
+        preferences: {
+          usageTelemetry: true,
+          crashReports: false
+        }
+      },
+      workspace: {
+        scope: 'workspace',
+        workspaceId: 'spec-workspace',
+        source: 'default',
+        preferences: {
+          usageTelemetry: true,
+          crashReports: false
+        }
+      },
+      effective: {
+        scope: 'workspace',
+        workspaceId: 'spec-workspace',
+        source: 'default',
+        preferences: {
+          usageTelemetry: true,
+          crashReports: false
+        }
+      },
+      telemetry: {
+        bufferPath: '/tmp/telemetry/events.jsonl',
+        eventCount: 0,
+        fileBytes: 0,
+        dropped: 0,
+        lastSequence: 0,
+        oldestRecordedAt: undefined,
+        newestRecordedAt: undefined,
+        levels: { error: 0, warn: 0, info: 0, debug: 0 },
+        scopes: { main: 0, renderer: 0, preload: 0, shared: 0 },
+        collectionEnabled: true
+      }
+    }),
+    privacyUpdateConsent: jest.fn(),
+    privacyExportData: jest.fn().mockResolvedValue({
+      path: '/tmp/privacy/export.json',
+      recordCount: 0,
+      exportedAt: Date.now(),
+      mode: 'all'
+    }),
+    privacyDeleteData: jest.fn().mockResolvedValue({
+      deleted: true,
+      clearedRecords: 0,
+      bufferPath: '/tmp/telemetry/events.jsonl'
+    }),
     featureFlagsList: jest.fn().mockResolvedValue({
       flags: [],
       activeKeys: [],
@@ -61,6 +126,36 @@ function createNexusBridge() {
       sources: [],
       unknownFlags: [],
       loadErrors: []
+    }),
+    aiControllerGetHealth: jest.fn().mockResolvedValue({
+      status: 'stopped',
+      installRoot: '/tmp/.nexus/ai/llama.cpp',
+      installed: false,
+      endpoint: 'http://127.0.0.1:39281/health',
+      host: '127.0.0.1',
+      port: 39281,
+      process: {
+        restarts: 0,
+        restartOnCrash: true
+      },
+      health: {
+        ok: false,
+        checkedAt: Date.now(),
+        error: 'controller not started'
+      },
+      recentOutput: []
+    }),
+    aiControllerStart: jest.fn(),
+    aiControllerStop: jest.fn(),
+    aiControllerBenchmark: jest.fn().mockResolvedValue({
+      iterations: 3,
+      warmupIterations: 1,
+      endpoint: 'http://127.0.0.1:39281/health',
+      samples: [],
+      summary: {
+        successes: 0,
+        failures: 3
+      }
     }),
     fsCreateEntry: jest.fn().mockResolvedValue({ paths: [] }),
     fsRenameEntry: jest.fn().mockResolvedValue({ paths: [] }),
@@ -224,6 +319,8 @@ describe('workbench shell bootstrap', () => {
       mode: 'form'
     });
     expect((settingsSnapshot as { editorResource: string }).editorResource).toBe('settings://user/form');
+    const privacySnapshot = await module.commandRegistry.executeCommand('nexus.privacy.center.open');
+    expect((privacySnapshot as { editorResource: string }).editorResource).toBe('privacy://center');
     const jsonSnapshot = await module.commandRegistry.executeCommand('nexus.settings.editor.json', {
       scope: 'user',
       text: JSON.stringify({ 'editor.tabSize': 6 }, null, 2)
@@ -238,5 +335,6 @@ describe('workbench shell bootstrap', () => {
     expect((runSnapshot as { editorResource: string }).editorResource).toBe('run-config://form');
     const runItems = await module.commandPalette.search('launch');
     expect(runItems.items.some((item: { id: string }) => item.id.startsWith('run-config:'))).toBe(true);
+    expect(typeof globalWindow.window?.nexus?.aiControllerGetHealth).toBe('function');
   });
 });

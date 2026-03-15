@@ -13,6 +13,11 @@
 | `NEXUS_FEATURE_FLAGS_FILE` | Local feature-flag manifest path. | `<NEXUS_DATA_DIR>/config/feature-flags.json` | Electron main |
 | `NEXUS_FEATURE_FLAGS_URL` | Optional remote feature-flag manifest URL. | (unset) | Electron main |
 | `NEXUS_FEATURE_FLAGS` | Inline env overrides for feature flags. | (unset) | Electron main |
+| `NEXUS_LLAMACPP_ROOT` | Root directory of the managed llama.cpp checkout/build. | `<NEXUS_DATA_DIR>/ai/llama.cpp` | Electron main + AI runtime |
+| `NEXUS_LLAMACPP_BINARY` | Optional explicit path to the `llama-server`/`server` binary. | Auto-discovered under `NEXUS_LLAMACPP_ROOT` | Electron main + AI runtime |
+| `NEXUS_LLAMACPP_HOST` | Bind host for the managed llama.cpp server. | `127.0.0.1` | Electron main + AI runtime |
+| `NEXUS_LLAMACPP_PORT` | Bind port for the managed llama.cpp server. | `39281` | Electron main + AI runtime |
+| `NEXUS_LLAMACPP_HEALTH_TIMEOUT_MS` | Timeout for HTTP health probes against llama.cpp. | `3000` | Electron main + AI runtime |
 | `NEXUS_REGISTRY_URL` | Optional custom npm registry. | (unset) | Yarn install scripts |
 
 ## Handling Secrets
@@ -26,7 +31,7 @@
 
 ## Validation Strategy
 1. `packages/platform/config/env.ts` exports `readEnv()` and throws if variables are invalid.
-2. Unit tests cover env parsing, path normalization, URL validation, and feature-flag/crash-reporting contracts.
+2. Unit tests cover env parsing, path normalization, URL validation, AI runtime validation, and feature-flag/crash-reporting contracts.
 3. During packaging, ensure `.env` is optional; production builds rely on OS env injection or config files.
 
 ## Telemetry
@@ -34,3 +39,4 @@
 - Add log redaction middleware (placeholder for IDE-125).
 - Crash reports must be anonymized before local persistence or remote upload. User and workspace absolute paths are not allowed to leave the process boundary in raw form.
 - Feature-flag overrides are operational controls, not secrets, but they still must be validated and logged in normalized form only.
+- AI runtime overrides are operational controls too; only normalized paths, host, port, and health timeouts should be logged.

@@ -21,6 +21,11 @@ Nexus relies on a strict set of environment variables so every service, extensio
 | `NEXUS_FEATURE_FLAGS_FILE` | `<NEXUS_DATA_DIR>/config/feature-flags.json` | Local feature-flag manifest path. | Supports staged rollout and kill-switch rules. |
 | `NEXUS_FEATURE_FLAGS_URL` | _unset_ | Optional remote feature-flag manifest URL. | Refreshed after app ready. |
 | `NEXUS_FEATURE_FLAGS` | _unset_ | Inline env override list for feature flags. | Example: `flag.a=true,flag.b=rollout:25`. |
+| `NEXUS_LLAMACPP_ROOT` | `<NEXUS_DATA_DIR>/ai/llama.cpp` | Managed llama.cpp checkout/build root. | Installer and desktop AI controller share this default. |
+| `NEXUS_LLAMACPP_BINARY` | _auto-discovered_ | Optional explicit path to `llama-server` or legacy `server`. | Useful for enterprise-managed runtimes. |
+| `NEXUS_LLAMACPP_HOST` | `127.0.0.1` | Bind host for the managed llama.cpp server. | Keep loopback in most deployments. |
+| `NEXUS_LLAMACPP_PORT` | `39281` | Bind port for the managed llama.cpp server. | Must be a positive integer. |
+| `NEXUS_LLAMACPP_HEALTH_TIMEOUT_MS` | `3000` | Timeout for llama.cpp HTTP health probes. | Must be a positive integer. |
 
 ## Directory layout
 
@@ -30,14 +35,20 @@ Nexus relies on a strict set of environment variables so every service, extensio
     storage-migrations.log    # append-only JSON lines
   settings/
   ai/
+    llama.cpp/
   logs/
+  privacy/
+    user-consent.json
+    exports/
   telemetry/
   workspaces/                 # default value for NEXUS_WORKSPACE_DATA
 ```
 
-- `NEXUS_DATA_DIR` defaults to `NEXUS_HOME`. Services can create subdirectories (`logs/`, `window-state/`, `telemetry/`) under this root without additional configuration.
+- `NEXUS_DATA_DIR` defaults to `NEXUS_HOME`. Services can create subdirectories (`logs/`, `window-state/`, `telemetry/`, `privacy/`) under this root without additional configuration.
+- The managed llama.cpp runtime defaults to `<NEXUS_DATA_DIR>/ai/llama.cpp`; the controller also detects the legacy `<NEXUS_HOME>/llama.cpp` path for backward compatibility.
 - Feature-flag manifests default to `<NEXUS_DATA_DIR>/config/feature-flags.json`, keeping rollout policy with the rest of local observability state.
 - Crash reports live under `NEXUS_DATA_DIR/logs/crash.log`; optional enterprise uploads reuse the same anonymized payload instead of building a separate format.
+- Privacy consent lives under `NEXUS_DATA_DIR/privacy/user-consent.json`, workspace overrides live under `NEXUS_WORKSPACE_DATA/privacy-consent/`, and export bundles live under `NEXUS_DATA_DIR/privacy/exports/`.
 - Renderer persistence is scoped to `NEXUS_WORKSPACE_DATA`; workspace trust, history, and session restore live here to keep them portable for enterprise sync.
 - Crash-safe backups live under `<NEXUS_WORKSPACE_DATA>/backups/<workspaceId>/snapshot.json`. Each snapshot includes dirty editors, terminal scrollback, and run/debug metadata while enforcing a hard 500 MB per-workspace cap.
 - `~/.nexus` is not assumed to exist; the runtime now guarantees creation through the storage layout helper described below.
@@ -72,7 +83,8 @@ Nexus relies on a strict set of environment variables so every service, extensio
 ## Operational guidance
 
 - **Enterprise overrides**: set `NEXUS_HOME` to a managed mount (e.g., `/var/opt/nexus/<user>`) and allow the migration helper to move existing `.nexus` data.
-- **Telemetry/privacy**: logs live under `NEXUS_DATA_DIR/logs` and structured telemetry buffers live under `NEXUS_DATA_DIR/telemetry`; redirecting this directory moves crash dumps, startup traces, and telemetry replay data together.
+- **Telemetry/privacy**: logs live under `NEXUS_DATA_DIR/logs`, structured telemetry buffers live under `NEXUS_DATA_DIR/telemetry`, and privacy consent/export state lives under `NEXUS_DATA_DIR/privacy`; redirecting this directory moves crash dumps, startup traces, telemetry replay data, and user-level privacy state together.
 - **Crash uploads**: `NEXUS_CRASH_REPORTING_URL` only enables an opt-in action in the crash dialog. No crash payload is uploaded automatically, and absolute user/workspace paths are redacted before persistence or upload.
 - **Feature flags**: use `NEXUS_FEATURE_FLAGS_FILE` for local policy, `NEXUS_FEATURE_FLAGS` for emergency env overrides, and `--feature-flag` / `--disable-feature-flag` for one-off launch-time changes.
+- **AI runtime**: use `NEXUS_LLAMACPP_ROOT` when the runtime is installed outside the default managed location, and `NEXUS_LLAMACPP_BINARY` only when discovery cannot find `llama-server` or legacy `server`.
 - **Backups**: copy the entire `NEXUS_HOME` directory; migration metadata ensures restores respect policy overrides on next launch.

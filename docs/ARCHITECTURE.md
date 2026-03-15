@@ -3,7 +3,7 @@
 ## Layered View
 1. **Electron Shell (Main + Preload)**
    - Manages windows, menus, auto-update, crash handling, file associations, env-detected `.nexus` directories.
-   - Preload exposes audited, typed IPC bridges (fs, settings, telemetry, AI, extensions) with schema validation.
+   - Preload exposes audited, typed IPC bridges (fs, settings, telemetry, privacy, AI, extensions) with schema validation.
 2. **Angular Workbench (Renderer)**
    - Provides layout shell (activity bar, docking, panels, status bar, i18n-aware UI components) and hosts feature modules (Explorer, SCM, Search, AI, etc.).
    - Command registry + palette service supply fuzzy-searched quick open across commands/recent files, honoring keybindings + locale metadata and driving the renderer command palette UI.
@@ -44,7 +44,7 @@
 5. Telemetry logged (latency, token usage, guardrail status) respecting privacy settings.
 
 ## Observability & Reliability
-- Telemetry instrumentation aggregated via OpenTelemetry, stored locally until consent.
+- Telemetry instrumentation aggregated via OpenTelemetry, stored locally when effective consent allows collection, with export/delete controls exposed through the privacy center.
 - Crash reporter writes dumps, prompts safe mode, attaches logs.
 - Feature flag service consumes config from local file or future remote endpoint.
 - Diagnostics page surfaces health of AI, extension host, indexer, search, SCM, terminal subsystems.
@@ -88,6 +88,10 @@
   - `workspace`
 - `packages/platform/observability` now contains:
   - `telemetry-store.ts` for local event buffering, replay, retention, and redaction
+  - `privacy-consent-store.ts` for user/workspace consent persistence
+- `packages/ai-core` now contains:
+  - `controller/llama-controller.ts` for managed llama.cpp process lifecycle, health checks, restart policy, and runtime argument construction
+  - `controller/llama-benchmark.ts` for reusable health benchmark execution and percentile summaries
 - `packages/platform/theming` now contains:
   - `theme-token-catalog.ts` for the canonical design-token inventory and built-in defaults
   - `theme-registry.ts` for manifest/schema/inheritance resolution
@@ -98,6 +102,7 @@
 ## App Organization Rules
 - Applications follow the same domain-first rule as shared packages. Root `main.ts` and `preload.ts` files are allowed only as deliberate entrypoints.
 - `apps/desktop-shell/src` currently uses:
+  - `ai`
   - `bootstrap`
   - `filesystem`
   - `preload`
@@ -113,6 +118,7 @@
   - `editor`
   - `explorer`
   - `i18n`
+  - `observability`
   - `run-debug`
   - `scm`
   - `settings`

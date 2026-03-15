@@ -18,8 +18,8 @@
 - Startup flow rehydrates stored windows in most-recently-focused order; if none exist, a default window is created. Workspace arguments passed via CLI/OS integration open additional windows on top of the restored set.
 
 ## IPC & Preload
-- Contracts defined in `packages/contracts/ipc.ts` (`nexus:get-env`, `nexus:log`, `nexus:new-window`, `nexus:get-window-session`, `nexus:open-workspace`, telemetry APIs, and feature-flag APIs).
-- Preload exposes the safe API via `window.nexus.getEnv/log/openNewWindow/getWindowSession/openWorkspace/telemetry*/featureFlagsList` under `contextIsolation` with `nodeIntegration` disabled.
+- Contracts defined in `packages/contracts/ipc.ts` (`nexus:get-env`, `nexus:log`, `nexus:new-window`, `nexus:get-window-session`, `nexus:open-workspace`, telemetry APIs, privacy APIs, feature-flag APIs, and AI controller APIs).
+- Preload exposes the safe API via `window.nexus.getEnv/log/openNewWindow/getWindowSession/openWorkspace/telemetry*/privacy*/featureFlagsList/aiController*` under `contextIsolation` with `nodeIntegration` disabled.
 - The current preload remains non-sandboxed at the Electron window level (`sandbox: false`) because the shell loads modular compiled preload files instead of a single bundle; renderer code still runs without Node globals.
 - Runtime `@nexus/*` alias resolution searches both compiled package roots (`dist/apps/desktop-shell/packages` and `dist/apps/workbench/packages`) so preload-loaded workbench modules can resolve shared platform/contracts code correctly.
 - `WindowManager` resolves the preload entry from the compiled `windowing/` output to `../preload.js` (with a same-directory fallback), keeping BrowserWindow startup aligned with the TypeScript build layout in `dist/apps/desktop-shell/apps/desktop-shell/src/`.
@@ -47,7 +47,13 @@
 - `TelemetryService` (`apps/desktop-shell/src/system/telemetry-service.ts`) wraps the shared `TelemetryStore` (`packages/platform/observability/telemetry-store.ts`) and persists structured events to `<NEXUS_DATA_DIR>/telemetry/events.jsonl`.
 - IPC contracts now expose `nexus:telemetry:track`, `nexus:telemetry:replay`, and `nexus:telemetry:health`, allowing preload and renderer callers to record structured events and retrieve local replay/health summaries without direct filesystem access.
 - Renderer logs sent through `nexus:log` are mirrored into telemetry as `renderer.log` events, while startup completion and fatal crashes emit `desktop.startup.completed` and `desktop.crash.captured`.
-- Telemetry attributes with sensitive key names are redacted before persistence so the platform is safe to expand before the consent center and exporter tasks land.
+- Telemetry attributes with sensitive key names are redacted before persistence, and collection now consults the effective privacy consent snapshot before writing to disk.
+
+## Privacy Center (IDE-170)
+- `PrivacyService` (`apps/desktop-shell/src/system/privacy-service.ts`) persists user consent under `<NEXUS_DATA_DIR>/privacy/user-consent.json`, workspace overrides under `<NEXUS_WORKSPACE_DATA>/privacy-consent/<workspace-id>.json`, and export bundles under `<NEXUS_DATA_DIR>/privacy/exports/`.
+- IPC contracts now expose `nexus:privacy:get-consent`, `nexus:privacy:update-consent`, `nexus:privacy:export-data`, and `nexus:privacy:delete-data`.
+- Consent is modeled per category (`usageTelemetry`, `crashReports`) with both user-scope and workspace-scope timestamps.
+- Remote crash upload now requires both the feature-flag kill switch to be enabled and the effective `crashReports` consent category to be enabled.
 
 ## Feature Flags (IDE-121)
 - `FeatureFlagService` (`apps/desktop-shell/src/system/feature-flag-service.ts`) evaluates a typed flag registry from a local manifest, env overrides, CLI overrides, and an optional remote manifest refresh.
@@ -55,6 +61,12 @@
 - Built-in flags currently cover observability rollout control: `observability.remoteCrashReporting`, `observability.performanceTracing`, and `observability.healthDiagnostics`.
 - Telemetry events automatically carry the current flag snapshot summary and `ff:<key>` tags for active flags, so staged rollout state is visible in replay and diagnostics.
 - Remote crash reporting now respects the `observability.remoteCrashReporting` kill switch even when the crash endpoint is configured in env.
+
+## AI Controller (IDE-085)
+- `LlamaControllerService` (`apps/desktop-shell/src/ai/llama-controller-service.ts`) is the desktop-facing facade over the shared `packages/ai-core/controller/llama-controller.ts` runtime.
+- The service manages the local `llama-server` subprocess lifecycle, auto-discovers binaries under `<NEXUS_DATA_DIR>/ai/llama.cpp` (plus the legacy `<NEXUS_HOME>/llama.cpp` layout), resolves relative model paths under `<NEXUS_DATA_DIR>/ai/models`, and exposes typed IPC endpoints for health, start, stop, and benchmark operations.
+- Health probes use the managed loopback HTTP endpoint (`/health`) with a configurable timeout, and unexpected process exits trigger bounded automatic restart attempts when `restartOnCrash` is enabled.
+- Benchmarking is intentionally health-focused at this stage: the benchmark harness measures repeated health-probe latency and failure rate so later AI tasks can compare runtime stability before token streaming is added.
 
 ## Startup Performance Budget (IDE-016)
 - `StartupMetrics` (`apps/desktop-shell/src/system/startup-metrics.ts`) records monotonic performance marks for bootstrap phases (`env-configured`, `app:ready`, `services:initialized`, `windows:restored`, `window-ready`). Once the first window is displayed, a JSON report is written to `<NEXUS_DATA_DIR>/logs/startup.json` and a summary line is logged.
@@ -66,7 +78,7 @@
 - `yarn nx run desktop-shell:serve` – builds the workbench renderer, builds the desktop shell, then launches Electron.
 
 ## Next Steps
-- Expand diagnostics surfaces on top of telemetry and crash replay (`IDE-120`) and add consent/privacy controls (`IDE-170`).
+- Expand diagnostics surfaces on top of telemetry and crash replay (`IDE-120`).
 
 ## Auto-update Scaffolding (IDE-014)
 - `UpdateService` (`apps/desktop-shell/src/system/update-service.ts`) wraps Electron's `autoUpdater`, configures the feed URL from `NEXUS_UPDATE_URL` (or defaults to `https://updates.nexus.dev/<channel>`), and attaches rich logging for each lifecycle event (checking, available, not-available, download progress, downloaded, errors).

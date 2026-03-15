@@ -2,11 +2,15 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname "$0")/../.." && pwd)"
-mkdir -p "$REPO_ROOT/.nexus"
-cd "$REPO_ROOT/.nexus"
+NEXUS_HOME="${NEXUS_HOME:-$REPO_ROOT/.nexus}"
+NEXUS_DATA_DIR="${NEXUS_DATA_DIR:-$NEXUS_HOME}"
+LLAMA_ROOT="${NEXUS_LLAMACPP_ROOT:-$NEXUS_DATA_DIR/ai/llama.cpp}"
 
-if [ ! -d llama.cpp ]; then
-  git clone https://github.com/ggerganov/llama.cpp.git
+mkdir -p "$(dirname "$LLAMA_ROOT")"
+
+if [ ! -d "$LLAMA_ROOT" ]; then
+  git clone https://github.com/ggerganov/llama.cpp.git "$LLAMA_ROOT"
 fi
-cd llama.cpp
+
+cd "$LLAMA_ROOT"
 make LLAMA_OPENBLAS=1

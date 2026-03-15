@@ -186,7 +186,7 @@ Status legend: [ ] TODO, [-] In progress, [x] Done. Update each task line as you
 
 | Status | ID | Title | Epic | Owner | Stage | Priority | Critical | Blockers | Verification | Docs/API |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [ ] | IDE-085 | llama.cpp controller service | AI Core Infrastructure (llama.cpp) | AI | Foundation | P0 | Yes | Blocked until IDE-005 | Verification: llama.cpp health checks + benchmark harness | Docs/API: docs/ai/core for IDE-085 |
+| [x] | IDE-085 | llama.cpp controller service | AI Core Infrastructure (llama.cpp) | AI | Foundation | P0 | Yes | Blocked until IDE-005 | Verification: llama.cpp health checks + benchmark harness | Docs/API: docs/ai/core for IDE-085 |
 | [ ] | IDE-086 | Model discovery & registry | AI Core Infrastructure (llama.cpp) | AI | Foundation | P0 | Yes | Blocked until IDE-085 | Verification: llama.cpp health checks + benchmark harness | Docs/API: docs/ai/core for IDE-086 |
 | [ ] | IDE-087 | Prompt orchestration engine | AI Core Infrastructure (llama.cpp) | AI | Foundation | P0 | Yes | Blocked until IDE-085 | Verification: llama.cpp health checks + benchmark harness | Docs/API: docs/ai/core for IDE-087 |
 | [ ] | IDE-088 | Streaming + cancellation | AI Core Infrastructure (llama.cpp) | AI | Foundation | P0 | Yes | Blocked until IDE-085 | Verification: llama.cpp health checks + benchmark harness | Docs/API: docs/ai/core for IDE-088 |
@@ -251,7 +251,7 @@ Status legend: [ ] TODO, [-] In progress, [x] Done. Update each task line as you
 | [ ] | IDE-120 | Health diagnostics page | Observability / Reliability | infra | Expansion | P1 | No | Blocked until IDE-117, IDE-085 | Verification: Telemetry replay + health dashboards | Docs/API: docs/observability for IDE-120 |
 | [x] | IDE-121 | Feature flag framework | Observability / Reliability | infra | Foundation | P0 | Yes | Blocked until IDE-005 | Verification: Telemetry replay + health dashboards | Docs/API: docs/observability for IDE-121 |
 | [ ] | IDE-122 | Safe mode + extension bisect | Observability / Reliability | infra | Expansion | P1 | No | Blocked until IDE-084 | Verification: Telemetry replay + health dashboards | Docs/API: docs/observability for IDE-122 |
-| [ ] | IDE-170 | Telemetry consent & privacy center | Observability / Reliability | infra | Foundation | P0 | Yes | Blocked until IDE-117, IDE-106 | Verification: Telemetry replay + health dashboards | Docs/API: docs/observability for IDE-170 |
+| [x] | IDE-170 | Telemetry consent & privacy center | Observability / Reliability | infra | Foundation | P0 | Yes | Blocked until IDE-117, IDE-106 | Verification: Telemetry replay + health dashboards | Docs/API: docs/observability for IDE-170 |
 | [ ] | IDE-171 | Alerting & webhook integration | Observability / Reliability | infra | Expansion | P1 | No | Blocked until IDE-119, IDE-120 | Verification: Telemetry replay + health dashboards | Docs/API: docs/observability for IDE-171 |
 
 ## Sprint S18

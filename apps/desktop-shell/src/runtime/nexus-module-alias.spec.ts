@@ -53,6 +53,21 @@ describe('nexus module alias runtime resolver', () => {
     expect(resolved).toBe(`${path.resolve(packageRoots[1], 'platform/theming/theme-registry')}.js`);
   });
 
+  it('resolves ai-core package aliases through the shared package roots', () => {
+    const packageRoots = ['/workspace/nexus/dist/apps/desktop-shell/packages'];
+    const request = '@nexus/ai-core/controller/llama-controller';
+
+    const resolved = resolveAliasedModuleRequest(
+      request,
+      packageRoots,
+      candidateRequest => `${candidateRequest}.js`,
+      undefined,
+      false
+    );
+
+    expect(resolved).toBe(`${path.resolve(packageRoots[0], 'ai-core/controller/llama-controller')}.js`);
+  });
+
   it('does not patch module aliases in jest environments', () => {
     const result = registerNexusModuleAliases('/tmp/dist/apps/desktop-shell/apps/desktop-shell/src', () => true);
     expect(result).toBe(false);

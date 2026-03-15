@@ -10,6 +10,7 @@ import type {
   LaunchConfigurationEditorService,
   LaunchConfigurationEditorSnapshot
 } from '../run-debug/launch-configuration-editor-service';
+import type { PrivacyCenterService } from '../observability/privacy-center-service';
 import type { DebugSessionStore } from '../run-debug/debug-session-store';
 import type { I18nService } from '../i18n/i18n-service';
 import {
@@ -52,6 +53,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     gitHistoryStore,
     debugSessionStore,
     settingsEditorService,
+    privacyCenterService,
     launchConfigurationEditorService,
     i18nService
   } = bootstrap;
@@ -78,6 +80,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
       elements.editor,
       snapshot,
       settingsEditorService,
+      privacyCenterService,
       launchConfigurationEditorService,
       debugSessionStore,
       commandRegistry,
@@ -96,6 +99,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     gitHistoryStore.onDidChange(() => render()),
     debugSessionStore.onDidChange(() => render()),
     settingsEditorService.onDidChange(() => render()),
+    privacyCenterService.onDidChange(() => render()),
     launchConfigurationEditorService.onDidChange(() => render()),
     i18nService.onDidChangeLocale(() => render())
   ];
@@ -105,6 +109,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     shell,
     commandRegistry,
     settingsEditorService,
+    privacyCenterService,
     launchConfigurationEditorService,
     gitStatusStore,
     debugSessionStore
@@ -181,6 +186,7 @@ function bindWorkbenchEvents(
   shell: WorkbenchShell,
   commandRegistry: CommandRegistry,
   settingsEditorService: SettingsEditorService,
+  privacyCenterService: PrivacyCenterService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
   gitStatusStore: GitStatusStore,
   debugSessionStore: DebugSessionStore
@@ -251,6 +257,9 @@ function bindWorkbenchEvents(
           mode: target.dataset.mode === 'json' ? 'json' : 'form'
         });
         break;
+      case 'privacy-open':
+        void privacyCenterService.open();
+        break;
       case 'settings-reset':
         if (target.dataset.key && target.dataset.scope) {
           settingsEditorService.resetSetting(target.dataset.key, target.dataset.scope as SettingsScope);
@@ -310,6 +319,27 @@ function bindWorkbenchEvents(
       case 'run-debug-stop':
         void commandRegistry.executeCommand('nexus.run.debug.stop');
         break;
+      case 'privacy-refresh':
+        void privacyCenterService.refresh();
+        break;
+      case 'privacy-export':
+        void privacyCenterService.exportData(target.dataset.mode === 'workspace' ? 'workspace' : 'all');
+        break;
+      case 'privacy-delete':
+        void privacyCenterService.deleteData(target.dataset.deleteExports !== 'false');
+        break;
+      case 'privacy-consent-apply': {
+        const scope = target.dataset.scope === 'workspace' ? 'workspace' : 'user';
+        const usageInput = host.querySelector<HTMLInputElement>(`[data-privacy-usage="${scope}"]`);
+        const crashInput = host.querySelector<HTMLInputElement>(`[data-privacy-crash="${scope}"]`);
+        if (usageInput && crashInput) {
+          void privacyCenterService.updateConsent(scope, {
+            usageTelemetry: usageInput.checked,
+            crashReports: crashInput.checked
+          });
+        }
+        break;
+      }
       case 'run-debug-frame-select':
         debugSessionStore.selectStackFrame(
           target.dataset.frameId ? Number(target.dataset.frameId) : undefined
@@ -615,6 +645,7 @@ function renderEditors(
   editor: HTMLElement,
   snapshot: WorkbenchSnapshot,
   settingsEditorService: SettingsEditorService,
+  privacyCenterService: PrivacyCenterService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
   debugSessionStore: DebugSessionStore,
   commandRegistry: CommandRegistry,
@@ -662,6 +693,7 @@ function renderEditors(
                   activeTab?.resource,
                   activeTab?.title,
                   settingsEditorService,
+                  privacyCenterService,
                   launchConfigurationEditorService,
                   debugSessionStore
                 )}
@@ -852,6 +884,7 @@ function renderEditorContent(
   resource: string | undefined,
   title: string | undefined,
   settingsEditorService: SettingsEditorService,
+  privacyCenterService: PrivacyCenterService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
   debugSessionStore: DebugSessionStore
 ) {
@@ -873,6 +906,9 @@ function renderEditorContent(
   }
   if (resource.startsWith('settings://')) {
     return renderSettingsEditor(settingsEditorService);
+  }
+  if (resource.startsWith('privacy://')) {
+    return renderPrivacyCenterEditor(privacyCenterService);
   }
   if (resource.startsWith('run-config://')) {
     return renderLaunchConfigurationEditor(launchConfigurationEditorService);
@@ -1545,6 +1581,172 @@ function renderSettingsEditor(settingsEditorService: SettingsEditorService) {
           ? renderSettingsForm(snapshot.activeScope, snapshot.sections)
           : renderSettingsJson(snapshot.activeScope, snapshot.jsonText, snapshot.issues)
       }
+    </div>
+  `;
+}
+
+function renderPrivacyCenterEditor(privacyCenterService: PrivacyCenterService) {
+  const snapshot = privacyCenterService.getSnapshot();
+  const consent = snapshot.consent;
+  if (!consent) {
+    return `
+      <div class="nexus-card">
+        <h3>Privacy Center</h3>
+        <p class="nexus-error">${escapeHtml(snapshot.error ?? 'Privacy data is unavailable.')}</p>
+        <div class="nexus-inline-actions">
+          <button class="nexus-primary-button" data-action="privacy-refresh">Retry</button>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="nexus-settings-editor nexus-privacy-center">
+      <div class="nexus-settings-toolbar">
+        <div>
+          <div class="nexus-file-badge">Privacy</div>
+          <strong>Telemetry Consent & Data Controls</strong>
+          <div class="nexus-muted">Workspace: ${escapeHtml(consent.workspaceId ?? 'No workspace override')}</div>
+        </div>
+        <div class="nexus-inline-actions">
+          <button class="nexus-ghost-button" data-action="privacy-refresh">Refresh</button>
+          <button class="nexus-ghost-button" data-action="privacy-open">Reopen</button>
+        </div>
+      </div>
+      <div class="nexus-card-stack">
+        <div class="nexus-card">
+          <div class="nexus-split">
+            <div>
+              <h3>Buffered Telemetry</h3>
+              <p class="nexus-muted">Events are stored locally at ${escapeHtml(consent.telemetry.bufferPath)}.</p>
+            </div>
+            <span class="nexus-file-badge">${consent.telemetry.eventCount} events</span>
+          </div>
+          <div class="nexus-run-config-grid">
+            <div class="nexus-card">
+              <strong>Collection</strong>
+              <div class="nexus-muted">${consent.telemetry.collectionEnabled ? 'Enabled' : 'Disabled'}</div>
+            </div>
+            <div class="nexus-card">
+              <strong>Buffer Size</strong>
+              <div class="nexus-muted">${consent.telemetry.fileBytes} bytes</div>
+            </div>
+            <div class="nexus-card">
+              <strong>Dropped</strong>
+              <div class="nexus-muted">${consent.telemetry.dropped}</div>
+            </div>
+          </div>
+          <div class="nexus-inline-actions">
+            <button class="nexus-primary-button" data-action="privacy-export" data-mode="all">Export All Data</button>
+            <button class="nexus-ghost-button" data-action="privacy-export" data-mode="workspace" ${consent.workspaceId ? '' : 'disabled'}>Export Workspace Data</button>
+            <button class="nexus-ghost-button" data-action="privacy-delete" data-delete-exports="true">Delete Buffered Data</button>
+          </div>
+          ${
+            snapshot.lastExport
+              ? `<p class="nexus-muted">Last export: ${escapeHtml(snapshot.lastExport.path)} (${snapshot.lastExport.recordCount} records)</p>`
+              : ''
+          }
+          ${
+            snapshot.lastDelete
+              ? `<p class="nexus-muted">Last delete cleared ${snapshot.lastDelete.clearedRecords} buffered record${snapshot.lastDelete.clearedRecords === 1 ? '' : 's'}.</p>`
+              : ''
+          }
+        </div>
+        <div class="nexus-card">
+          <h3>User Consent</h3>
+          <p class="nexus-muted">Applies across all workspaces unless a workspace override is saved.</p>
+          ${renderPrivacyConsentForm('user', consent.user, consent.categories, snapshot.loading)}
+        </div>
+        ${
+          consent.workspaceId
+            ? `
+              <div class="nexus-card">
+                <h3>Workspace Consent</h3>
+                <p class="nexus-muted">Overrides the user baseline for ${escapeHtml(consent.workspaceId)}.</p>
+                ${renderPrivacyConsentForm(
+                  'workspace',
+                  consent.workspace ?? {
+                    scope: 'workspace',
+                    workspaceId: consent.workspaceId,
+                    source: 'default',
+                    preferences: consent.user.preferences
+                  },
+                  consent.categories,
+                  snapshot.loading
+                )}
+              </div>
+            `
+            : ''
+        }
+        <div class="nexus-card">
+          <h3>Effective Consent</h3>
+          <div class="nexus-list">
+            ${consent.categories
+              .map(
+                category => `
+                  <div class="nexus-list-item">
+                    <div class="nexus-list-item-meta">
+                      <strong>${escapeHtml(category.title)}</strong>
+                      <div class="nexus-muted">${escapeHtml(category.description)}</div>
+                    </div>
+                    <span class="nexus-file-badge">${consent.effective.preferences[category.key] ? 'On' : 'Off'}</span>
+                  </div>
+                `
+              )
+              .join('')}
+          </div>
+          <p class="nexus-muted">
+            Effective scope: ${escapeHtml(consent.effective.scope)}
+            ${consent.effective.updatedAt ? ` · Updated ${new Date(consent.effective.updatedAt).toLocaleString()}` : ' · Not yet reviewed'}
+          </p>
+        </div>
+        ${
+          snapshot.error
+            ? `<div class="nexus-card nexus-error-block"><strong>Privacy Error</strong><div>${escapeHtml(snapshot.error)}</div></div>`
+            : ''
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderPrivacyConsentForm(
+  scope: 'user' | 'workspace',
+  record: {
+    scope?: string;
+    workspaceId?: string;
+    source?: string;
+    preferences: Record<'usageTelemetry' | 'crashReports', boolean>;
+    updatedAt?: number;
+  },
+  categories: Array<{ key: 'usageTelemetry' | 'crashReports'; title: string; description: string }>,
+  loading: boolean
+) {
+  return `
+    <div class="nexus-card-stack">
+      ${categories
+        .map(
+          category => `
+            <label class="nexus-setting-row">
+              <div>
+                <strong>${escapeHtml(category.title)}</strong>
+                <div class="nexus-muted">${escapeHtml(category.description)}</div>
+              </div>
+              <div class="nexus-setting-control">
+                <input
+                  type="checkbox"
+                  ${record.preferences[category.key] ? 'checked' : ''}
+                  data-privacy-${category.key === 'usageTelemetry' ? 'usage' : 'crash'}="${scope}"
+                />
+              </div>
+            </label>
+          `
+        )
+        .join('')}
+      <div class="nexus-inline-actions">
+        <button class="nexus-primary-button" data-action="privacy-consent-apply" data-scope="${scope}" ${loading ? 'disabled' : ''}>Save ${scope === 'user' ? 'User' : 'Workspace'} Consent</button>
+      </div>
+      <p class="nexus-muted">${record.updatedAt ? `Updated ${new Date(record.updatedAt).toLocaleString()}` : 'Not yet reviewed.'}</p>
     </div>
   `;
 }

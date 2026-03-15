@@ -21,6 +21,10 @@ function createBridge() {
     telemetryTrack: jest.fn(),
     telemetryReplay: jest.fn(),
     telemetryGetHealth: jest.fn(),
+    privacyGetConsent: jest.fn(),
+    privacyUpdateConsent: jest.fn(),
+    privacyExportData: jest.fn(),
+    privacyDeleteData: jest.fn(),
     featureFlagsList: jest.fn().mockResolvedValue({
       flags: [],
       activeKeys: [],
@@ -29,6 +33,10 @@ function createBridge() {
       unknownFlags: [],
       loadErrors: []
     }),
+    aiControllerGetHealth: jest.fn(),
+    aiControllerStart: jest.fn(),
+    aiControllerStop: jest.fn(),
+    aiControllerBenchmark: jest.fn(),
     fsCreateEntry: jest.fn().mockResolvedValue(resolved),
     fsRenameEntry: jest.fn().mockResolvedValue(resolved),
     fsMoveEntries: jest.fn().mockResolvedValue(resolved),

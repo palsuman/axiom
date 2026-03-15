@@ -41,6 +41,9 @@ type CrashReporterDependencies = {
   featureFlags?: {
     isEnabled: (key: string) => boolean;
   };
+  privacy?: {
+    canShareCrashReports: (workspaceId?: string) => boolean;
+  };
   localSink?: LocalCrashFileSink;
   remoteSink?: EnterpriseCrashEndpointSink;
 };
@@ -149,6 +152,7 @@ export class CrashReporter {
   private readonly localSink: LocalCrashFileSink;
   private readonly remoteSink?: EnterpriseCrashEndpointSink;
   private readonly featureFlags?: NonNullable<CrashReporterDependencies['featureFlags']>;
+  private readonly privacy?: NonNullable<CrashReporterDependencies['privacy']>;
 
   constructor(
     private readonly env: NexusEnv,
@@ -162,6 +166,7 @@ export class CrashReporter {
     this.arch = deps.arch ?? process.arch;
     this.nodeVersion = deps.nodeVersion ?? process.version;
     this.featureFlags = deps.featureFlags;
+    this.privacy = deps.privacy;
     this.localSink =
       deps.localSink ??
       new LocalCrashFileSink(path.join(this.env.nexusDataDir ?? this.env.nexusHome, 'logs', 'crash.log'), deps.fs ?? fs);
@@ -215,7 +220,11 @@ export class CrashReporter {
   }
 
   canSubmit() {
-    return Boolean(this.remoteSink) && this.featureFlags?.isEnabled('observability.remoteCrashReporting') !== false;
+    return (
+      Boolean(this.remoteSink) &&
+      this.featureFlags?.isEnabled('observability.remoteCrashReporting') !== false &&
+      this.privacy?.canShareCrashReports() !== false
+    );
   }
 
   async submit(report: CrashReport): Promise<CrashSubmitResult> {

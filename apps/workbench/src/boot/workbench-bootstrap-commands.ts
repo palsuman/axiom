@@ -264,6 +264,21 @@ export function registerWorkbenchCommands(context: WorkbenchBootstrapContext) {
   });
 
   context.commandRegistry.register({
+    id: 'nexus.privacy.center.open',
+    title: t('command.privacy.center.open', 'Open Privacy Center'),
+    category: 'Preferences',
+    handler: () => context.privacyCenterService.open()
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.privacy.center.inspect',
+    title: 'Inspect Privacy Center Snapshot',
+    category: 'Preferences',
+    hidden: true,
+    handler: () => context.privacyCenterService.getSnapshot()
+  });
+
+  context.commandRegistry.register({
     id: 'nexus.locale.cycle',
     title: t('command.locale.cycle', 'Cycle Display Language'),
     category: 'Preferences',

@@ -57,4 +57,31 @@ describe('TelemetryStore', () => {
     expect(replay.dropped).toBe(1);
     expect(store.getHealth().lastSequence).toBe(3);
   });
+
+  it('supports previewing and clearing buffered telemetry', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexus-telemetry-clear-'));
+    const store = new TelemetryStore({
+      bufferPath: path.join(tempDir, 'telemetry', 'events.jsonl'),
+      now: () => 2000
+    });
+
+    const preview = store.preview({
+      name: 'preview.event',
+      scope: 'main'
+    });
+    expect(preview.sequence).toBe(1);
+    expect(store.getHealth().eventCount).toBe(0);
+
+    store.track({
+      name: 'persisted.event',
+      scope: 'main'
+    });
+    expect(store.getAllRecords()).toHaveLength(1);
+
+    expect(store.clear()).toEqual({
+      clearedRecords: 1,
+      bufferPath: path.join(tempDir, 'telemetry', 'events.jsonl')
+    });
+    expect(store.getHealth().eventCount).toBe(0);
+  });
 });
