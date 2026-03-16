@@ -10,6 +10,7 @@ The current shell contract covers:
 - a declarative panel host used for terminal, output, problems, and future extension-contributed panels
 - shell-level accessibility labels and roving-toolbar keyboard behavior
 - the command palette and quick open surface used for command execution and navigation entry points
+- Angular shell composition parity for activity bar, sidebars, editor area, panel docking, locale hooks, and status bar integration under `apps/workbench/angular`
 
 Related subsystem docs:
 
@@ -23,8 +24,6 @@ Related subsystem docs:
   - canonical shell state mutation API
 - `apps/workbench/src/shell/workbench-layout-store.ts`
   - persisted shell layout snapshot storage
-- `apps/workbench/src/shell/workbench-dom-renderer.ts`
-  - renderer DOM mount, interaction wiring, and command palette shell
 - `apps/workbench/src/shell/panel-host-service.ts`
   - declarative panel contribution registry and built-in panel content models
 - `apps/workbench/src/commands/command-registry.ts`
@@ -33,6 +32,10 @@ Related subsystem docs:
   - provider-based quick open search aggregation
 - `apps/workbench/src/commands/command-palette-controller.ts`
   - visible command palette state, keyboard routing, result selection, and command execution
+- `apps/workbench/angular/src/app/services/angular-workbench-layout.service.ts`
+  - Angular composition layer that reuses the historical layout/i18n contracts and exposes a real shell snapshot for the migrated renderer
+- `apps/workbench/angular/src/app/components/workbench-shell/workbench-shell.component.ts`
+  - Angular workbench shell component that renders the migrated activity bar, sidebars, editor area, panel, and status bar
 
 ## Command Palette Contract
 
@@ -90,3 +93,5 @@ Targeted verification:
 Broader workbench verification:
 
 - `yarn nx run workbench:test`
+- `yarn nx run workbench:test-angular`
+- `yarn nx run workbench:build-angular`

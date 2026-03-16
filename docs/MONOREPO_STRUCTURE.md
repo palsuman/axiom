@@ -4,12 +4,12 @@
 .
 ├── apps/
 │   ├── desktop-shell/        # Electron main + preload entrypoints, auto-update, OS hooks
-│   ├── workbench/            # Angular renderer/workbench UI
+│   ├── workbench/            # Current TS renderer/workbench; migration target is Angular
 │   └── agent-runner/         # Optional CLI/agent harness for AI automation + testing
 ├── packages/
 │   ├── contracts/            # Shared IPC & API typings
 │   ├── platform/             # Workspace models, services, stores
-│   ├── ui-kit/               # Angular component library, theming, localization helpers
+│   ├── ui-kit/               # Current shell/UI primitives; target scope includes Angular component library, theming, localization helpers
 │   ├── editor-adapter/       # Monaco configuration, text model lifecycle utilities
 │   ├── ai-core/              # llama.cpp orchestration SDK, prompt DSL, guardrails
 │   └── extension-host/       # Sandbox runtime, RPC transport, activation registry

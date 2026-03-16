@@ -18,7 +18,7 @@ Deliver a professional, AI-first desktop IDE that rivals IntelliJ IDEA and VS Co
 | Enterprise readiness | Signed Win/macOS/Linux installers, SBOM export, telemetry opt-in/out |
 
 ## Core Capabilities
-1. **Workbench Shell**: Angular-based layout with activity bar, multi-pane docking, command palette, panels (problems/output/AI), theming, localization.
+1. **Workbench Shell**: Current renderer is TS + direct DOM; target state is an Angular-based layout with activity bar, multi-pane docking, right-side utility surfaces, command palette, panels (problems/output/AI), theming, localization, and run/debug/test shell architecture.
 2. **Workspace & Explorer**: Multi-root projects, fast tree virtualization, CRUD, Git decorations, virtual FS providers, crash recovery, `.nexus` storage via env vars (`NEXUS_HOME`, `NEXUS_DATA_DIR`).
 3. **Editor Platform**: Monaco integration, text model lifecycle, diagnostics, navigation, formatting, CodeLens, diff/review mode, large file handling.
 4. **Search**: Quick open, full-text search with streaming results, replace-in-files, optional persistent indexing.

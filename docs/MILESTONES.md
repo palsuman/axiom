@@ -3,7 +3,7 @@
 | Phase | Description | Key Epics | Exit Criteria | Target Sprint Range |
 | --- | --- | --- | --- | --- |
 | Phase 0 – Foundations | Monorepo, tooling, CI, ADR governance, env policy. | Platform Foundations | Nx builds/smoke tests pass on clean clone; ADR/CI gates live. | S1 |
-| Phase 1 – Core Workbench | Electron main/preload, Angular shell, performance budgets. | Electron Shell, Angular Workbench | Secure multi-window shell with command palette + dockable panels; startup <3s. | S2–S3 |
+| Phase 1 – Core Workbench | Electron main/preload, renderer migration to Angular, performance budgets. | Electron Shell, Renderer Migration / Angular Workbench Target | Angular shell becomes the primary renderer path, command palette + dockable panels are available on that path, and startup remains <3s. | S2–S3 |
 | Phase 2 – Workspace & Explorer | Workspace management, explorer CRUD/decorations, Monaco editor foundation. | Workspace System, File Explorer, Editor Platform | Multi-root workspace loads 50k files, explorer/edit/save functional with backups. | S4–S6 |
 | Phase 3 – Extensions & Language Platform | Extension host, manifest/API surface, LSP infrastructure. | Extension Platform, Language Platform | Sample extension contributes commands/views; TS LSP diagnostics operational with sandboxing. | S7–S9 |
 | Phase 4 – SCM/Terminal/Search | Git workflows, terminal PTY, search suite. | SCM, Terminal, Search | Staging/commit/branch flows, persistent terminal splits, streaming search results. | S10–S11 |

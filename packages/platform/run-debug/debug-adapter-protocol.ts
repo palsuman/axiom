@@ -24,8 +24,6 @@ export type DebugProtocolEvent = {
 
 export type DebugProtocolMessage = DebugProtocolRequest | DebugProtocolResponse | DebugProtocolEvent;
 
-const HEADER_DELIMITER = Buffer.from('\r\n\r\n', 'utf8');
-
 export function serializeDebugProtocolMessage(message: DebugProtocolMessage) {
   const payload = JSON.stringify(message);
   const contentLength = Buffer.byteLength(payload, 'utf8');
@@ -33,22 +31,28 @@ export function serializeDebugProtocolMessage(message: DebugProtocolMessage) {
 }
 
 export class DebugProtocolMessageParser {
-  private buffer = Buffer.alloc(0);
+  private buffer: Buffer = Buffer.alloc(0);
 
-  push(chunk: string | Buffer): DebugProtocolMessage[] {
-    const nextChunk = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
-    this.buffer = this.buffer.length === 0 ? nextChunk : Buffer.concat([this.buffer, nextChunk]);
+  push(chunk: string | Uint8Array | Buffer): DebugProtocolMessage[] {
+    const nextChunk =
+      typeof chunk === 'string'
+        ? Buffer.from(chunk, 'utf8')
+        : Buffer.isBuffer(chunk)
+          ? chunk
+          : Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+    const chunks = [this.buffer, nextChunk] as unknown as readonly Uint8Array<ArrayBufferLike>[];
+    this.buffer = this.buffer.length === 0 ? nextChunk : Buffer.concat(chunks);
 
     const messages: DebugProtocolMessage[] = [];
     while (this.buffer.length) {
-      const headerEnd = this.buffer.indexOf(HEADER_DELIMITER);
+      const headerEnd = this.buffer.indexOf('\r\n\r\n');
       if (headerEnd < 0) {
         break;
       }
 
       const headersText = this.buffer.subarray(0, headerEnd).toString('utf8');
       const contentLength = readContentLength(headersText);
-      const payloadStart = headerEnd + HEADER_DELIMITER.length;
+      const payloadStart = headerEnd + '\r\n\r\n'.length;
       const payloadEnd = payloadStart + contentLength;
       if (this.buffer.length < payloadEnd) {
         break;

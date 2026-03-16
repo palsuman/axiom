@@ -1,0 +1,68 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "apps",
+  "projects": {
+    "workbench-angular": {
+      "projectType": "application",
+      "root": "apps/workbench/angular",
+      "sourceRoot": "apps/workbench/angular/src",
+      "prefix": "nexus",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:application",
+          "options": {
+            "outputPath": "dist/apps/workbench/angular",
+            "index": "apps/workbench/angular/src/index.html",
+            "browser": "apps/workbench/angular/src/main.ts",
+            "tsConfig": "apps/workbench/angular/tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "apps/workbench/angular/public",
+                "output": "/"
+              }
+            ],
+            "styles": ["apps/workbench/angular/src/styles.css"],
+            "inlineStyleLanguage": "css"
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "750kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "6kB",
+                  "maximumError": "12kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "workbench-angular:build:production"
+            },
+            "development": {
+              "buildTarget": "workbench-angular:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    }
+  }
+}

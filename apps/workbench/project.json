@@ -23,6 +23,36 @@
         "command": "eslint apps/workbench/src --ext .ts"
       }
     },
+    "build-angular": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/workbench/angular"],
+      "options": {
+        "command": "node tools/scripts/run-with-env.mjs workbench:build:angular ./node_modules/.bin/ng build workbench-angular --configuration development"
+      },
+      "configurations": {
+        "production": {
+          "command": "node tools/scripts/run-with-env.mjs workbench:build:angular ./node_modules/.bin/ng build workbench-angular --configuration production"
+        }
+      }
+    },
+    "lint-angular": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/workbench/angular/src apps/workbench/angular/setup-jest.ts --ext .ts"
+      }
+    },
+    "test-angular": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config apps/workbench/jest.angular.config.cjs --runInBand"
+      }
+    },
+    "serve-angular": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/scripts/run-with-env.mjs workbench:serve:angular ./node_modules/.bin/ng serve workbench-angular --configuration development"
+      }
+    },
     "test": {
       "executor": "nx:run-commands",
       "options": {

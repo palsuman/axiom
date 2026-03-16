@@ -1,0 +1,168 @@
+<main class="workbench-shell">
+  <header class="workbench-shell__hero">
+    <div>
+      <p class="eyebrow">Angular shell parity</p>
+      <h1>Nexus Workbench</h1>
+      <p class="summary">{{ model().message }}</p>
+    </div>
+    <div class="hero-actions">
+      <button type="button" class="action" (click)="showCommandPalette()">Command Palette</button>
+      <button type="button" class="action" (click)="cycleLocale()">Locale</button>
+      <button type="button" class="action" (click)="toggleTheme()">Theme</button>
+    </div>
+  </header>
+
+  <section
+    class="workbench-grid"
+    [style.gridTemplateColumns]="model().shell.gridTemplate.columns"
+    [style.gridTemplateRows]="model().shell.gridTemplate.rows"
+    aria-label="Angular workbench shell"
+  >
+    <nav
+      class="surface activity-bar"
+      [class.is-hidden]="model().shell.placements.activityBar.hidden"
+      [ngStyle]="getPlacementStyle('activityBar')"
+    >
+      <button
+        *ngFor="let activity of model().shell.activityBar.items"
+        type="button"
+        class="icon-button"
+        [class.is-active]="activity.id === model().shell.activityBar.activeId"
+        [attr.aria-label]="activity.title"
+        (click)="activateActivity(activity.id)"
+      >
+        <span class="codicon" [ngClass]="'codicon-' + activity.icon"></span>
+      </button>
+    </nav>
+
+    <aside
+      class="surface sidebar"
+      [class.is-hidden]="model().shell.placements.primarySidebar.hidden"
+      [ngStyle]="getPlacementStyle('primarySidebar')"
+    >
+      <div class="surface__header">
+        <strong>{{ model().shell.sidebar.activeViewId || 'Sidebar' }}</strong>
+        <button type="button" class="surface__action" (click)="togglePrimarySidebar()">Toggle</button>
+      </div>
+      <div class="surface__tabs">
+        <button
+          *ngFor="let view of model().shell.sidebar.views"
+          type="button"
+          class="tab"
+          [class.is-active]="view.id === model().shell.sidebar.activeViewId"
+          (click)="activateSidebarView(view.id)"
+        >
+          {{ view.title }}
+        </button>
+      </div>
+      <div class="surface__body">
+        <p class="surface__copy">Angular renders the migrated primary sidebar using the historical workbench layout contract.</p>
+      </div>
+    </aside>
+
+    <section class="surface editor-area" [ngStyle]="getPlacementStyle('editor')">
+      <div class="surface__header">
+        <strong>Editors</strong>
+        <button type="button" class="surface__action" (click)="openSettings()">Settings</button>
+      </div>
+      <div class="editor-groups">
+        <article *ngFor="let group of model().shell.editors.groups" class="editor-group">
+          <div class="surface__tabs">
+            <button
+              *ngFor="let tab of group.tabs"
+              type="button"
+              class="tab"
+              [class.is-active]="tab.id === group.activeTabId"
+              (click)="focusEditor(tab.resource)"
+            >
+              {{ tab.title }}
+            </button>
+          </div>
+          <div class="editor-group__body">
+            <p>{{ getActiveEditorResource(group.id) }}</p>
+            <p class="surface__copy">The Angular shell now owns the editor-area composition and preserves editor-group structure from the historical layout model.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <aside
+      class="surface secondary-sidebar"
+      [class.is-hidden]="model().shell.placements.secondarySidebar.hidden"
+      [ngStyle]="getPlacementStyle('secondarySidebar')"
+    >
+      <div class="surface__header">
+        <strong>{{ model().shell.secondarySidebar.activeViewId || 'Utility' }}</strong>
+      </div>
+      <div class="surface__tabs">
+        <button
+          *ngFor="let view of model().shell.secondarySidebar.views"
+          type="button"
+          class="tab"
+          [class.is-active]="view.id === model().shell.secondarySidebar.activeViewId"
+          (click)="activateSidebarView(view.id, 'secondary')"
+        >
+          {{ view.title }}
+        </button>
+      </div>
+      <div class="surface__body">
+        <p class="surface__copy">Secondary sidebar remains available for utility surfaces and is the precursor for the dedicated right utility panel work.</p>
+      </div>
+    </aside>
+
+    <section
+      class="surface panel"
+      [class.panel--right]="model().shell.panel.position === 'right'"
+      [class.is-hidden]="model().shell.placements.panel.hidden"
+      [ngStyle]="getPlacementStyle('panel')"
+    >
+      <div class="surface__header">
+        <strong>{{ model().shell.panel.activeViewId || 'Panel' }}</strong>
+        <div class="surface__actions">
+          <button type="button" class="surface__action" (click)="setPanelPosition('bottom')">Bottom</button>
+          <button type="button" class="surface__action" (click)="setPanelPosition('right')">Right</button>
+        </div>
+      </div>
+      <div class="surface__tabs">
+        <button
+          *ngFor="let view of model().shell.panel.views"
+          type="button"
+          class="tab"
+          [class.is-active]="view.id === model().shell.panel.activeViewId"
+          (click)="activatePanelView(view.id)"
+        >
+          {{ view.title }}
+        </button>
+      </div>
+      <div class="surface__body">
+        <p class="surface__copy">Panel docking is owned by the Angular shell and currently supports bottom/right placement using the migrated layout model.</p>
+      </div>
+    </section>
+
+    <footer class="surface status-bar" [ngStyle]="getPlacementStyle('statusBar')">
+      <div class="status-bar__left">
+        <span *ngFor="let item of model().shell.statusBar.items" class="status-item" [class.status-item--right]="item.alignment === 'right'">
+          <ng-container *ngIf="item.alignment === 'left'">
+            {{ typeof item.text === 'string' ? item.text : item.text.fallback.replace('{locale}', model().locale) }}
+          </ng-container>
+        </span>
+      </div>
+      <div class="status-bar__right">
+        <span *ngFor="let item of model().shell.statusBar.items" class="status-item">
+          <ng-container *ngIf="item.alignment === 'right'">
+            {{ typeof item.text === 'string' ? item.text : item.text.fallback }}
+          </ng-container>
+        </span>
+      </div>
+    </footer>
+  </section>
+
+  <aside class="palette" *ngIf="commandHost.palette().open" aria-label="Angular command palette">
+    <header class="palette__header">
+      <strong>{{ commandHost.palette().title }}</strong>
+      <button type="button" class="palette__close" (click)="closeCommandPalette()">Esc</button>
+    </header>
+    <p class="palette__hint">{{ commandHost.palette().hint }}</p>
+    <p class="palette__meta">Angular now owns shell composition, layout docking, locale hooks, and theme-aware shell rendering.</p>
+  </aside>
+</main>

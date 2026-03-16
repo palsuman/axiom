@@ -1,16 +1,27 @@
 # Nexus Architecture Overview
 
+## Renderer State
+- **Primary state:** Electron now launches the Angular renderer/workbench shell by default from `apps/workbench/angular`.
+- **Legacy DOM renderer:** removed from the Electron preload path.
+- **Target state:** Angular remains the committed canonical renderer/workbench framework for all resumed renderer feature work.
+- **Migration rule:** Until renderer migration signoff completes, only migration work, migration blocker fixes, and documentation/package alignment should proceed for the renderer.
+- **Decision record:** [ADR-11](/Users/sumanpal/Developer/Projects/nexus/docs/adr/ADR-11.md) is the authoritative renderer framework decision and defines the migration completion and resume gate.
+- **Retirement record:** [ADR-12](/Users/sumanpal/Developer/Projects/nexus/docs/adr/ADR-12.md) records the removal of the legacy DOM renderer from the Electron runtime path.
+- **Alignment contract:** [renderer-migration.md](/Users/sumanpal/Developer/Projects/nexus/docs/architecture/renderer-migration.md) is the authoritative current-state/target-state/package-alignment document for the renderer migration.
+
 ## Layered View
 1. **Electron Shell (Main + Preload)**
    - Manages windows, menus, auto-update, crash handling, file associations, env-detected `.nexus` directories.
    - Preload exposes audited, typed IPC bridges (fs, settings, telemetry, privacy, AI, extensions) with schema validation.
-2. **Angular Workbench (Renderer)**
-   - Provides layout shell (activity bar, docking, panels, status bar, i18n-aware UI components) and hosts feature modules (Explorer, SCM, Search, AI, etc.).
-   - Command registry + palette service supply fuzzy-searched quick open across commands/recent files, honoring keybindings + locale metadata and driving the renderer command palette UI.
+2. **Renderer / Angular Workbench Target**
+   - Primary implementation: Angular shell host, standalone zoneless bootstrap, Angular command/theme host services, and CLI/Jest targets under `apps/workbench/angular`.
+   - Legacy DOM renderer: removed from the preload/runtime path; the remaining TypeScript services and stores under `apps/workbench/src` are historical shell/domain modules and migration references, not an alternate renderer host.
+   - Target implementation: Angular provides the primary layout shell (activity bar, docking, right utility panel, panels, status bar, AI chat surface, run/debug/test shell, i18n-aware UI components) and hosts feature modules.
+   - Command registry + palette service already exist as shared renderer contracts and must be adopted by the Angular shell instead of duplicated.
 3. **Shared Packages**
    - `packages/contracts`: TypeScript interfaces for IPC, extension APIs, prompt schemas.
-  - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `observability`, `workspace`, `settings`, `theming`, `windowing`, `scm`, `run-debug`).
-   - `packages/ui-kit`: reusable Angular components + theme tokens.
+   - `packages/platform`: domain-organized shared runtime contracts and services (`config`, `filesystem`, `observability`, `workspace`, `settings`, `theming`, `windowing`, `scm`, `run-debug`).
+   - `packages/ui-kit`: current UI/shell primitives and theme docs; target scope includes reusable Angular components built on the same contracts.
    - `packages/editor-adapter`: Monaco configuration, model lifecycle helpers.
    - `packages/ai-core`: llama.cpp orchestration SDK, prompt DSL, telemetry hooks.
    - `packages/extension-host`: RPC protocol, sandbox enforcement, lifecycle manager.
@@ -64,7 +75,8 @@
 - Search + indexing pipeline leverages worker threads/service processes to avoid blocking UI.
 
 ## Localization
-- Angular i18n service + locale switcher; translation pipeline ensures resource bundling per locale.
+- Current renderer already owns locale/runtime switching contracts.
+- Target Angular shell must consume the same locale contract and translation pipeline for resource bundling per locale.
 - Telemetry logs missing translations for cleanup.
 
 ## Docs & Governance
@@ -96,6 +108,11 @@
   - `theme-token-catalog.ts` for the canonical design-token inventory and built-in defaults
   - `theme-registry.ts` for manifest/schema/inheritance resolution
   - `theme-runtime.ts` for live token propagation, overrides, and consumer adapters
+- `packages/icons` now contains:
+  - `icon-registry.ts` for icon definition registration, aliases, and themed icon resolution
+  - `file-icon-resolver.ts` for deterministic file/folder icon selection
+  - `icon-theme-service.ts` for binding icon resolution to the shared theme runtime, cache invalidation, and icon-cache telemetry
+  - `builtin-icon-pack.ts` for the built-in codicon + curated file/folder icon definitions that ship with the Angular workbench
 - The theming subsystem now covers semantic colors plus typography, spacing, icon sizing, and layout sizing tokens, with live adoption in workbench shell CSS variables, Monaco, and the integrated terminal.
 - Root-level files in shared packages should be limited to metadata, config, and deliberate package entrypoints.
 
@@ -137,8 +154,23 @@
   - `settings/settings-service.ts` for persisted/resolved settings and theme runtime ownership
   - `settings/settings-editor-service.ts` for searchable form/JSON settings editor state and scope-aware workbench commands
   - `shell/workbench-shell.ts` as a facade over shell state, layout, and notification helpers
-  - `shell/workbench-dom-renderer.ts` for DOM mounting of the current workbench shell inside Electron
   - `shell/panel-host-service.ts` for declarative panel contribution registration and built-in output/problems panel state
   - `shell/workbench-shell-contract.ts`, `shell/workbench-shell-state.ts`, and `shell/workbench-shell-layout.ts` for focused shell internals
+- The Angular bootstrap split is:
+  - `angular/src/bootstrap.ts` for Angular host creation and `bootstrapApplication`
+  - `angular/src/main.ts` as the browser entrypoint for the Angular renderer path
+  - `angular/src/app/components` for standalone UI components with companion template/style/spec files
+  - `angular/src/app/services` for bridge-aware shell/bootstrap services
+  - `angular/src/app/models` and `angular/src/app/types` for renderer-facing contracts
+  - `angular/src/app/providers` for DI tokens and bootstrapping providers
+  - `angular/src/app/directives` and `angular/src/app/pipes` reserved for future Angular shell primitives
+  - `angular/src/app/services/angular-theme-host.service.ts` for shared workbench `ThemeRuntime` ownership in the Angular bootstrap
+  - `angular/src/app/services/angular-icon-theme-host.service.ts` for Angular consumption of the shared icon theme service and cache snapshots
+  - `angular/src/app/services/angular-workbench-layout.service.ts` for Angular composition of the migrated activity bar, sidebars, editor area, panel, status bar, locale hooks, and shell snapshot
+  - `angular/src/styles/icons.css` for the built-in codicon font/CSS import and curated Nexus file/folder icon asset classes
+- Angular migration target:
+  - Angular must become the primary renderer path.
+  - The right activity bar, right utility panel, AI chat surface, and run/debug/test architecture must land on the Angular shell before paused renderer feature work resumes.
+  - The legacy DOM renderer has been removed from the Electron runtime path and must not be reintroduced.
 - App roots should not become feature buckets. If a subsystem grows beyond a single file, create a domain folder before the layout drifts.
 - Run / Debug / Test documentation lives in `docs/run-debug-test/README.md`, which is the authoritative contract for `launch.json`, debug-session IPC/event channels, and verification commands.

@@ -32,7 +32,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "yarn nx run workbench:build && yarn nx run desktop-shell:build --skip-nx-cache && node tools/scripts/run-with-env.mjs desktop-shell:serve ./node_modules/.bin/electron dist/apps/desktop-shell/main.js"
+        "command": "yarn nx run workbench:build-angular && yarn nx run desktop-shell:build --skip-nx-cache && node tools/scripts/run-with-env.mjs desktop-shell:serve ./node_modules/.bin/electron dist/apps/desktop-shell/main.js"
       }
     },
     "watch": {

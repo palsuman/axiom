@@ -39,6 +39,7 @@
 
 ## Runtime Contract
 - `ThemeRuntime` owns the active theme selection, fallback theme, scoped overrides, revisioning, and change notifications.
+- `IconThemeService` can bind to the same runtime so icon variant selection and icon/file cache invalidation follow the active workbench theme revision.
 - The runtime snapshot exposes:
   - the resolved active theme
   - merged token sections after override application
@@ -69,6 +70,16 @@
 - `apps/workbench/src/terminal/terminal-host.ts`
   - binds to the same runtime through `bindThemeRuntime(...)`
   - updates xterm colors, ANSI palette, font family, font size, line height, and host container styling on theme changes
+- `packages/icons/icon-theme-service.ts`
+  - binds icon resolution to `ThemeRuntime`
+  - invalidates icon/file caches when the theme revision changes
+  - exposes cache telemetry and icon-token snapshots for Angular and future renderer consumers
+- `apps/workbench/angular/src/app/services/angular-theme-host.service.ts`
+  - owns the Angular bootstrap `ThemeRuntime`
+  - applies shared runtime CSS variables, theme metadata, and icon sizing tokens onto `document.documentElement`
+- `apps/workbench/angular/src/app/services/angular-icon-theme-host.service.ts`
+  - binds the shared icon theme service to the Angular runtime
+  - exposes icon theme kind, cache stats, and icon token snapshots to Angular shell components
 - `apps/workbench/src/boot/workbench-bootstrap-runtime.ts`
   - mounts the default terminal with runtime-derived colors and sizing variables
   - wires the terminal host to the shared runtime during renderer startup
@@ -77,7 +88,7 @@
 
 ## Follow-on Work
 - `IDE-021` builds appearance commands and UX on top of the shared runtime.
-- `IDE-192` and `IDE-109` can now consume a stable theming foundation for icon and theme-pack work.
+- `IDE-109` can now consume a stable theming foundation for theme-pack work.
 
 ## Verification
 - `yarn nx run platform:test --runInBand`

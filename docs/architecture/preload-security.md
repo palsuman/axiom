@@ -14,7 +14,7 @@
 - `apps/desktop-shell/src/preload.ts` is the entrypoint; `apps/desktop-shell/src/preload/nexus-bridge.ts` exposes the minimal API:
   - `window.nexus.getEnv()` → returns `GetEnvResponse` via `ipcRenderer.invoke`.
   - `window.nexus.log({ level, message })` → sends structured logs.
-- Because the workbench DOM renderer is currently mounted from preload rather than a separately bundled page script, preload also keeps a private `globalThis.__NEXUS_PRELOAD_BRIDGE__` reference so preload-executed workbench modules resolve the same typed bridge without weakening the main-world API contract.
+- Because the Angular workbench bootstrap is initiated from preload rather than a separately bundled BrowserWindow HTML page, preload also keeps a private `globalThis.__NEXUS_PRELOAD_BRIDGE__` reference so preload-executed modules resolve the same typed bridge without weakening the main-world API contract.
 - Main-process validation and IPC registration live in `apps/desktop-shell/src/bootstrap/bootstrap-desktop-shell.ts`, keeping the bridge implementation separate from native privilege decisions.
 - `contextIsolation: true` and `nodeIntegration: false` guarantee renderer cannot access Node APIs directly.
 - `BrowserWindow` currently sets `sandbox: false` for the preload context because the desktop shell ships the preload as modular TypeScript output (`preload.js` + sibling modules) rather than a single bundled script. This preserves the secure renderer boundary while keeping local preload module loading functional.

@@ -22,3 +22,12 @@ These rules apply to every execution in this repository.
 
 7. Ship documentation as a first-class artifact.
    Every subsystem must have an authoritative doc describing purpose, ownership boundary, public contract, and verification path.
+
+8. Follow current Angular best practices for all Angular migration work.
+   For `apps/workbench/angular`, use standalone APIs, zoneless change detection, `OnPush`-compatible component design, signals for local reactive state, and one primary responsibility per file. Avoid reintroducing `NgModule`-first patterns, `zone.js`, or ad hoc file placement.
+
+9. Keep Angular app structure deliberate and non-ad hoc.
+   Under `src/app`, place Angular code in purpose-specific folders such as `components`, `services`, `models`, `types`, `providers`, `directives`, and `pipes`. Prefer a dedicated component folder when a component has companion template/style/spec files.
+
+10. Treat Angular guidance as an externally versioned contract.
+    When Angular architectural choices or best practices are in doubt, verify them against official Angular documentation first, especially the zoneless guide, `provideZonelessChangeDetection` API docs, and the Angular style guide.

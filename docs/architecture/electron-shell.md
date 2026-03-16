@@ -23,7 +23,8 @@
 - The current preload remains non-sandboxed at the Electron window level (`sandbox: false`) because the shell loads modular compiled preload files instead of a single bundle; renderer code still runs without Node globals.
 - Runtime `@nexus/*` alias resolution searches both compiled package roots (`dist/apps/desktop-shell/packages` and `dist/apps/workbench/packages`) so preload-loaded workbench modules can resolve shared platform/contracts code correctly.
 - `WindowManager` resolves the preload entry from the compiled `windowing/` output to `../preload.js` (with a same-directory fallback), keeping BrowserWindow startup aligned with the TypeScript build layout in `dist/apps/desktop-shell/apps/desktop-shell/src/`.
-- The preload layer now also mounts the compiled workbench DOM renderer after `DOMContentLoaded`, so Electron windows show the real workbench shell instead of a placeholder HTML card.
+- The preload layer now mounts the Angular workbench renderer after `DOMContentLoaded`, making Angular the canonical Electron renderer path.
+- The historical compiled DOM renderer has been removed from preload.
 - Renderer can request a new empty window or instruct the shell to launch a workspace in a new/reused window; it can also query the current window's session metadata to bootstrap the workbench services.
 
 ## Native Menus & Keymaps (IDE-012)
@@ -75,7 +76,7 @@
 
 ## Commands
 - `yarn nx run desktop-shell:build` – compiles TypeScript entrypoints.
-- `yarn nx run desktop-shell:serve` – builds the workbench renderer, builds the desktop shell, then launches Electron.
+- `yarn nx run desktop-shell:serve` – builds the Angular workbench renderer, builds the desktop shell, then launches Electron.
 
 ## Next Steps
 - Expand diagnostics surfaces on top of telemetry and crash replay (`IDE-120`).

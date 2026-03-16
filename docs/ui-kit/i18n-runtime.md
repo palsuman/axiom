@@ -14,6 +14,7 @@
 - [apps/workbench/src/shell/workbench-layout-store.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/shell/workbench-layout-store.ts) passes the shared i18n runtime into the bootstrapped shell so persisted layout state and runtime locale stay in sync.
 - [apps/workbench/src/boot/workbench-bootstrap-contributions.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/boot/workbench-bootstrap-contributions.ts) owns locale-aware quick-open providers and status bar bindings, keeping i18n-facing shell contributions out of the root bootstrap module.
 - [apps/workbench/src/boot/workbench-bootstrap-commands.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/boot/workbench-bootstrap-commands.ts) registers locale commands separately from service composition and runtime startup.
+- [apps/workbench/angular/src/app/services/angular-workbench-layout.service.ts](/Users/sumanpal/Developer/Projects/nexus/apps/workbench/angular/src/app/services/angular-workbench-layout.service.ts) now consumes the shared i18n runtime for Angular shell titles, status items, locale cycling, and locale-change notifications.
 
 ## Supported locales
 
@@ -49,6 +50,7 @@ The composed bootstrap registers:
 - a quick-open provider that surfaces supported languages
 
 Changing the locale updates the i18n runtime immediately and persists the new value back through the settings service.
+The Angular shell now uses the same runtime hooks for localized activity/sidebar/panel labels and status bar locale feedback while broader settings persistence parity continues under the remaining migration tasks.
 
 ## Extending translations
 

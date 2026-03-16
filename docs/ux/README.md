@@ -4,7 +4,7 @@
 
 ## Scope
 
-The renderer in [apps/workbench/src/shell/workbench-dom-renderer.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/shell/workbench-dom-renderer.ts) now provides:
+The current shell accessibility contract provides:
 
 - labeled landmarks for the activity bar, sidebars, editor, panel, and status bar
 - a skip link that moves keyboard users directly to the editor surface
@@ -13,7 +13,7 @@ The renderer in [apps/workbench/src/shell/workbench-dom-renderer.ts](/Users/suma
 - focus restoration after shell rerenders so keyboard users do not lose context
 - a polite live-region summary that announces high-level shell state changes
 
-The pure accessibility helpers live in [apps/workbench/src/shell/workbench-accessibility.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/shell/workbench-accessibility.ts). This file is the canonical place for keyboard-roving logic, landmark labels, and screen-reader summary generation.
+The pure accessibility helpers live in [apps/workbench/src/shell/workbench-accessibility.ts](/Users/sumanpal/Developer/Projects/nexus/apps/workbench/src/shell/workbench-accessibility.ts). This file is the canonical place for keyboard-roving logic, landmark labels, and screen-reader summary generation.
 
 ## Keyboard Contract
 
@@ -25,12 +25,12 @@ The pure accessibility helpers live in [apps/workbench/src/shell/workbench-acces
 
 ## Localization
 
-Accessibility labels are localized through [apps/workbench/src/i18n/i18n-service.ts](/Users/sumanpal/Developer/Projects/ide-project/nexus/apps/workbench/src/i18n/i18n-service.ts). New shell surfaces must add translation keys for accessible labels at the same time as the visible UI change.
+Accessibility labels are localized through [apps/workbench/src/i18n/i18n-service.ts](/Users/sumanpal/Developer/Projects/nexus/apps/workbench/src/i18n/i18n-service.ts). New shell surfaces must add translation keys for accessible labels at the same time as the visible UI change.
 
 ## Verification
 
 - `./node_modules/.bin/jest --config apps/workbench/jest.config.cjs --runInBand apps/workbench/src/shell/workbench-shell.spec.ts apps/workbench/src/shell/workbench-layout-store.spec.ts apps/workbench/src/shell/workbench-accessibility.spec.ts`
-- `./node_modules/.bin/eslint apps/workbench/src/shell/workbench-dom-renderer.ts apps/workbench/src/shell/workbench-accessibility.ts apps/workbench/src/shell/workbench-accessibility.spec.ts apps/workbench/src/i18n/i18n-service.ts`
+- `./node_modules/.bin/eslint apps/workbench/src/shell/workbench-accessibility.ts apps/workbench/src/shell/workbench-accessibility.spec.ts apps/workbench/src/i18n/i18n-service.ts`
 
 ## Follow-on Work
 

@@ -2,6 +2,105 @@
 
 Status legend: [ ] TODO, [-] In progress, [x] Done. Update each task line as you execute.
 
+## Renderer Migration Control
+
+**Epic Title:** Renderer Migration / Angular Workbench Target  
+**Priority:** P0  
+**Status:** Active control plan  
+**Rationale:** Angular is now installed and launched as the primary renderer path, and the historical preload-mounted DOM renderer has been removed. Migration control still remains necessary until the Angular shell meets the resume gate for paused renderer work.
+
+**Current state**
+- Primary renderer path: standalone zoneless Angular workbench under `apps/workbench/angular`.
+- Legacy DOM renderer: removed from Electron preload/runtime.
+- Build/test path: Angular CLI + Jest for the canonical renderer path, with the historical `tsc` path retained only for TypeScript module coverage while Angular parity work continues.
+
+**Target state**
+- Angular is the primary renderer/workbench framework.
+- Theme and icon systems are established and consumed through Angular shell primitives.
+- Shell supports right activity bar, right utility panel, AI chat surface, and run/debug/test architecture before paused renderer feature work resumes.
+
+**Execution policy**
+- Only renderer migration work, migration blocker fixes, and documentation/package alignment may continue for the renderer until migration signoff is complete.
+- No new renderer feature implementation may start outside the migration plan below.
+
+**Blocked note for existing renderer tasks**
+- `ON HOLD`: All existing renderer feature tasks not explicitly listed in the migration plan below are paused until the resume gate is satisfied.
+- This applies to current and future frontend/workbench feature work including shell polish, editor/explorer/search/settings UX additions, panel features, AI surfaces, and Angular-specific component tasks that are not part of migration sequencing.
+
+### Migration-First Task Board
+
+#### P0 Angular Migration + Docs/Tracker Alignment
+
+| Status | ID | Title | Priority | Acceptance Criteria |
+| --- | --- | --- | --- | --- |
+| [x] | IDE-206 | ADR: Renderer framework decision — migrate to Angular | P0 | ADR documents the current TS + direct DOM reality, confirms Angular as the target framework, explains why migration must happen now, and defines migration completion criteria and deprecation rules for the legacy DOM renderer. |
+| [x] | IDE-207 | Renderer architecture/docs/tracker/package alignment | P0 | `tasks/TASKS.md`, `tasks/TRACKER.md`, `docs/ARCHITECTURE.md`, and renderer planning docs distinguish current state from target state; package/dependency expectations are documented; all renderer workstreams point to the migration-first sequence. |
+| [x] | IDE-208 | Angular dependency and build bootstrap | P0 | Angular dependencies, Nx/workbench build targets, lint/test wiring, and bootstrap entrypoints exist and pass clean install/build/test on a fresh clone without relying on the legacy DOM renderer. |
+| [x] | IDE-209 | Angular shell host becomes primary renderer path | P0 | Electron launches the Angular shell by default; the workbench root, command routing, theming hooks, and preload bridge all run through Angular as the primary renderer path. |
+| [x] | IDE-210 | Legacy DOM renderer removal or formal deprecation | P0 | The current direct DOM renderer is removed from the Electron runtime path with documentation, ownership, sunset criteria, and no ambiguity about which renderer is canonical. |
+
+#### P1 Theme and Icon Foundations
+
+| Status | ID | Title | Priority | Acceptance Criteria |
+| --- | --- | --- | --- | --- |
+| [x] | IDE-198 | Theme registry + manifest schema | P1 | Complete. Theme manifest/schema foundation is already implemented and remains the required baseline for Angular shell theming. |
+| [x] | IDE-199 | Theme runtime + token pipeline | P1 | Complete. Live token propagation is already implemented and remains mandatory for Angular shell adoption. |
+| [x] | IDE-202 | Professional design token expansion | P1 | Complete. The expanded token catalog remains the visual contract for the Angular migration. |
+| [x] | IDE-190 | Icon domain model & registry | P1 | Complete. Central icon registry remains the required icon foundation. |
+| [x] | IDE-191 | File icon resolver & mapping pipeline | P1 | Complete. Resolver/mapping pipeline remains the required file icon foundation. |
+| [x] | IDE-192 | Icon theme service & caching telemetry | P1 | Angular shell can theme icons through the shared runtime; icon cache behavior and telemetry are verified under theme changes. |
+| [x] | IDE-194 | Built-in codicon and file icon packs | P1 | Codicon font/CSS and curated file/folder icon packs ship as the required icon asset library for the Angular shell and workbench UI. |
+
+#### P2 Angular Shell and Layout System
+
+| Status | ID | Title | Priority | Acceptance Criteria |
+| --- | --- | --- | --- | --- |
+| [x] | IDE-211 | Angular shell composition and layout parity | P2 | Angular shell reaches parity for activity bar, sidebars, editor area, status bar, panel docking, localization hooks, and settings/theme integration without depending on legacy DOM rendering. |
+| [ ] | IDE-212 | Right activity bar and right utility panel architecture | P2 | Angular shell supports a right activity bar and right-side utility panel suitable for notifications, inspector-style tools, and secondary surfaces similar to IntelliJ. |
+| [ ] | IDE-193 | Angular icon component & directives | P2 | Angular icon component/directives consume the shared icon registry, theme runtime, and codicon/file icon assets without duplicating icon logic. |
+
+#### P3 Core Panels and Workflows
+
+| Status | ID | Title | Priority | Acceptance Criteria |
+| --- | --- | --- | --- | --- |
+| [ ] | IDE-213 | Run/debug/test shell architecture and execution UX | P3 | Angular shell provides IntelliJ-style run/debug/test configuration, execution entrypoints, and durable panel architecture before resumed feature delivery. |
+| [ ] | IDE-214 | AI chat surface and right-panel integration | P3 | Angular shell exposes an IntelliJ-style AI chat surface integrated with the right panel and supporting future streamed AI workflows. |
+| [ ] | IDE-215 | Workbench visual direction and shell design system | P3 | Angular workbench visual direction is explicitly defined as clean and VS Code-inspired, using the shared theme/icon foundations with production-ready shell polish guidelines. |
+
+#### P4 Resume Paused Renderer Work After Migration Signoff
+
+| Status | ID | Title | Priority | Acceptance Criteria |
+| --- | --- | --- | --- | --- |
+| [ ] | IDE-216 | Renderer migration signoff and paused-work reopen | P4 | Resume gate checklist is fully satisfied, paused renderer tasks are re-sequenced on the Angular path, and no planning artifact still implies the legacy DOM renderer is the primary implementation. |
+
+### Migration Phases
+
+1. **Phase P0: Reality alignment and renderer decision**
+   Current/target architecture, ADR, tracker, package expectations, and execution policy are synchronized.
+   Exit criteria: `IDE-206` and `IDE-207` complete, migration-first sequencing published, and renderer hold policy active.
+2. **Phase P1: Theme and icon foundation lock**
+   Theme system remains the shell baseline and icon system reaches required asset/runtime completeness.
+   Exit criteria: theme foundation tasks remain green, `IDE-192` and `IDE-194` complete, and Angular shell can consume those foundations.
+3. **Phase P2: Angular shell becomes real**
+   Angular dependencies, build pipeline, shell composition, and right-side layout architecture are implemented.
+   Exit criteria: `IDE-208`, `IDE-209`, `IDE-211`, `IDE-212`, and `IDE-193` complete.
+4. **Phase P3: Core workflow architecture lands**
+   Run/debug/test architecture, AI chat surface, and visual direction are established on the Angular shell.
+   Exit criteria: `IDE-213`, `IDE-214`, and `IDE-215` complete.
+5. **Phase P4: Signoff and controlled resume**
+   Legacy DOM renderer is removed, docs are aligned, and paused renderer work can be re-opened on the Angular path.
+   Exit criteria: `IDE-210` and `IDE-216` complete and the resume gate passes.
+
+### Resume Gate Checklist
+
+- [ ] Angular shell is the primary renderer path.
+- [x] Legacy DOM renderer is removed.
+- [ ] Docs, tracker, and package dependencies are aligned with the Angular target.
+- [ ] Theme system is established and adopted by the Angular shell.
+- [ ] Icon system is established, including required icon asset packs/font library, and adopted by the Angular shell.
+- [ ] Shell supports right panel, AI chat surface, and run/debug/test architecture.
+- [ ] Build, lint, and test pass.
+
 ## Sprint S1
 
 | Status | ID | Title | Epic | Owner | Stage | Priority | Critical | Blockers | Verification | Docs/API |
@@ -36,30 +135,32 @@ Status legend: [ ] TODO, [-] In progress, [x] Done. Update each task line as you
 
 ## Sprint S3
 
+Renderer note: unless a task appears in the migration control plan above, pending renderer/frontend work in this sprint remains on hold until renderer migration signoff.
+
 | Status | ID | Title | Epic | Owner | Stage | Priority | Critical | Blockers | Verification | Docs/API |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [x] | IDE-017 | Workbench layout scaffolding | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-005 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-017 |
-| [x] | IDE-018 | Docking & split manager | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-018 |
-| [x] | IDE-019 | Status bar + notifications | Angular Workbench Shell | frontend | Foundation | P1 | No | Blocked until IDE-017 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-019 |
-| [x] | IDE-020 | Command palette + quick open shell | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-076 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-020 |
-| [ ] | IDE-021 | Theme + appearance service | Angular Workbench Shell | frontend | Foundation | P1 | No | Blocked until IDE-017, IDE-106, IDE-198, IDE-199 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-021 |
-| [x] | IDE-204 | Workbench app domain normalization | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-019, IDE-106, IDE-181, IDE-200 | Verification: workbench test target + full repo tests | Docs/API: docs/ARCHITECTURE + docs/ui-kit/i18n-runtime + docs/settings for IDE-204 |
-| [x] | IDE-205 | Workbench shell composition decomposition | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-019, IDE-106, IDE-181, IDE-200, IDE-204 | Verification: workbench test target + full repo tests | Docs/API: docs/ARCHITECTURE + docs/ui-kit/i18n-runtime + docs/settings + docs/extensions/git + docs/terminal for IDE-205 |
-| [x] | IDE-198 | Theme registry + manifest schema | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-106 | Verification: Theme registry unit tests + schema fixtures | Docs/API: docs/ui-kit/theme-system for IDE-198 |
-| [x] | IDE-202 | Professional design token expansion | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-198, IDE-199, IDE-200 | Verification: Theme registry/unit snapshots + editor/terminal integration tests | Docs/API: docs/ui-kit/theme-system for IDE-202 |
-| [x] | IDE-199 | Theme runtime + token pipeline | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-106, IDE-198 | Verification: Theme switching unit tests + Playwright shell smoke | Docs/API: docs/ui-kit/theme-system for IDE-199 |
-| [ ] | IDE-022 | Welcome & onboarding surface | Angular Workbench Shell | frontend | Expansion | P2 | No | Blocked until IDE-017 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-022 |
-| [ ] | IDE-023 | Workspace-aware breadcrumbs | Angular Workbench Shell | frontend | Foundation | P1 | No | Blocked until IDE-017, IDE-041 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-023 |
-| [ ] | IDE-024 | Context menu + dialog framework | Angular Workbench Shell | frontend | Foundation | P1 | No | Blocked until IDE-017 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-024 |
-| [ ] | IDE-025 | Busy/progress overlays | Angular Workbench Shell | frontend | Foundation | P1 | No | Blocked until IDE-017 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-025 |
-| [x] | IDE-147 | Panel host framework | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-020 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-147 |
-| [ ] | IDE-148 | Problems & output views | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-147, IDE-044 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-148 |
-| [x] | IDE-181 | i18n runtime + locale switcher | Angular Workbench Shell | frontend | Foundation | P0 | Yes | Blocked until IDE-017, IDE-106 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-181 |
-| [ ] | IDE-182 | Translation pipeline & tooling | Angular Workbench Shell | frontend | Foundation | P1 | No | Blocked until IDE-181, IDE-006 | Verification: Angular unit tests + Playwright shell smoke | Docs/API: docs/ui-kit for IDE-182 |
+| [x] | IDE-017 | Workbench layout scaffolding | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: Renderer unit tests + shell smoke | Docs/API: docs/ui-kit for IDE-017 |
+| [x] | IDE-018 | Docking & split manager | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: Renderer unit tests + shell smoke | Docs/API: docs/ui-kit for IDE-018 |
+| [x] | IDE-019 | Status bar + notifications | Renderer Migration / Angular Workbench Target | frontend | Foundation | P1 | No | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: Renderer unit tests + shell smoke | Docs/API: docs/ui-kit for IDE-019 |
+| [x] | IDE-020 | Command palette + quick open shell | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: Renderer unit tests + shell smoke | Docs/API: docs/ui-kit for IDE-020 |
+| [ ] | IDE-021 | Theme + appearance service | Renderer Migration / Angular Workbench Target | frontend | Foundation | P1 | No | On hold until IDE-208, IDE-209, and resume gate; foundation dependencies remain IDE-106, IDE-198, IDE-199 | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-021 |
+| [x] | IDE-204 | Workbench app domain normalization | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: workbench test target + full repo tests | Docs/API: docs/ARCHITECTURE + docs/ui-kit/i18n-runtime + docs/settings for IDE-204 |
+| [x] | IDE-205 | Workbench shell composition decomposition | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: workbench test target + full repo tests | Docs/API: docs/ARCHITECTURE + docs/ui-kit/i18n-runtime + docs/settings + docs/extensions/git + docs/terminal for IDE-205 |
+| [x] | IDE-198 | Theme registry + manifest schema | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Completed migration foundation; required for Angular shell adoption | Verification: Theme registry unit tests + schema fixtures | Docs/API: docs/ui-kit/theme-system for IDE-198 |
+| [x] | IDE-202 | Professional design token expansion | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Completed migration foundation; required for Angular shell adoption | Verification: Theme registry/unit snapshots + editor/terminal integration tests | Docs/API: docs/ui-kit/theme-system for IDE-202 |
+| [x] | IDE-199 | Theme runtime + token pipeline | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Completed migration foundation; required for Angular shell adoption | Verification: Theme switching unit tests + shell smoke | Docs/API: docs/ui-kit/theme-system for IDE-199 |
+| [ ] | IDE-022 | Welcome & onboarding surface | Renderer Migration / Angular Workbench Target | frontend | Expansion | P2 | No | On hold until IDE-216 resume gate; Angular shell must be primary renderer path first | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-022 |
+| [ ] | IDE-023 | Workspace-aware breadcrumbs | Renderer Migration / Angular Workbench Target | frontend | Foundation | P1 | No | On hold until IDE-216 resume gate; Angular shell must be primary renderer path first | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-023 |
+| [ ] | IDE-024 | Context menu + dialog framework | Renderer Migration / Angular Workbench Target | frontend | Foundation | P1 | No | On hold until IDE-216 resume gate; Angular shell must be primary renderer path first | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-024 |
+| [ ] | IDE-025 | Busy/progress overlays | Renderer Migration / Angular Workbench Target | frontend | Foundation | P1 | No | On hold until IDE-216 resume gate; Angular shell must be primary renderer path first | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-025 |
+| [x] | IDE-147 | Panel host framework | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 and IDE-213 | Verification: Renderer unit tests + shell smoke | Docs/API: docs/ui-kit for IDE-147 |
+| [ ] | IDE-148 | Problems & output views | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | On hold until IDE-211, IDE-213, and IDE-216 resume gate | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-148 |
+| [x] | IDE-181 | i18n runtime + locale switcher | Renderer Migration / Angular Workbench Target | frontend | Foundation | P0 | Yes | Historical DOM-renderer implementation completed; Angular migration parity tracked by IDE-211 | Verification: Renderer unit tests + shell smoke | Docs/API: docs/ui-kit for IDE-181 |
+| [ ] | IDE-182 | Translation pipeline & tooling | Renderer Migration / Angular Workbench Target | frontend | Foundation | P1 | No | On hold until IDE-208, IDE-209, and IDE-216 resume gate | Verification: Renderer unit tests + migration shell smoke | Docs/API: docs/ui-kit for IDE-182 |
 | [x] | IDE-190 | Icon domain model & registry | Icon System Platform | platform | Foundation | P0 | Yes | Blocked until IDE-017 | Verification: Icon registry unit tests + theme snapshot harness | Docs/API: docs/ui-kit/icon-module for IDE-190 |
-| [ ] | IDE-192 | Icon theme service & caching telemetry | Icon System Platform | frontend | Foundation | P0 | Yes | Blocked until IDE-190, IDE-021, IDE-199, IDE-117 | Verification: Theme switching unit tests + telemetry assertions | Docs/API: docs/ui-kit/icon-module for IDE-192 |
-| [ ] | IDE-193 | Angular icon component & directives | Icon System Platform | frontend | Foundation | P0 | Yes | Blocked until IDE-190, IDE-192, IDE-017 | Verification: Angular component tests + accessibility audit | Docs/API: docs/ui-kit/icon-module for IDE-193 |
-| [ ] | IDE-194 | Built-in codicon & file icon packs | Icon System Platform | frontend | Foundation | P0 | Yes | Blocked until IDE-190, IDE-191, IDE-193 | Verification: Explorer/tab/icon snapshot tests + asset lint | Docs/API: docs/ui-kit/icon-module for IDE-194 |
+| [ ] | IDE-192 | Icon theme service & caching telemetry | Icon System Platform | frontend | Foundation | P0 | Yes | Migration foundation task; complete before broad Angular shell implementation resumes | Verification: Theme switching unit tests + telemetry assertions | Docs/API: docs/ui-kit/icon-module for IDE-192 |
+| [ ] | IDE-193 | Angular icon component & directives | Icon System Platform | frontend | Foundation | P0 | Yes | Migration task in Phase P2; blocked until IDE-192 and Angular shell bootstrap are complete | Verification: Angular component tests + accessibility audit | Docs/API: docs/ui-kit/icon-module for IDE-193 |
+| [ ] | IDE-194 | Built-in codicon & file icon packs | Icon System Platform | frontend | Foundation | P0 | Yes | Migration foundation task; required icon font/library and file icon packs must land before resume gate passes | Verification: Explorer/tab/icon snapshot tests + asset lint | Docs/API: docs/ui-kit/icon-module for IDE-194 |
 | [ ] | IDE-197 | Icon module documentation & style contract | Icon System Platform | QA | Foundation | P1 | No | Blocked until IDE-194, IDE-143 | Verification: Doc lint + SME review | Docs/API: docs/ui-kit/icon-module for IDE-197 |
 
 ## Sprint S4
