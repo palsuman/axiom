@@ -16,6 +16,7 @@ import { DebugSessionStore } from '../run-debug/debug-session-store';
 import { LaunchConfigurationEditorService } from '../run-debug/launch-configuration-editor-service';
 import { PrivacyCenterService } from '../observability/privacy-center-service';
 import { WorkspaceHotExitService } from '../workspace/workspace-hot-exit-service';
+import { PanelHostService } from '../shell/panel-host-service';
 import type { ThemeRuntime } from '@nexus/platform/theming/theme-runtime';
 
 type NexusBridge = NonNullable<Window['nexus']> | undefined;
@@ -40,6 +41,7 @@ export type WorkbenchBootstrapContext = {
   settingsService: SettingsService;
   settingsEditorService: SettingsEditorService;
   privacyCenterService: PrivacyCenterService;
+  panelHostService: PanelHostService;
   debugSessionStore: DebugSessionStore;
   launchConfigurationEditorService: LaunchConfigurationEditorService;
   themeRuntime: ThemeRuntime;
@@ -56,6 +58,7 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
   const shell = layoutHandle.shell;
   const workspaceStateService = new WorkspaceStateService({ workspaceId: workspaceIdentity, shell });
   const hotExitService = new WorkspaceHotExitService({ workspaceId: workspaceIdentity });
+  const panelHostService = new PanelHostService(shell);
   const commandRegistry = new CommandRegistry();
   const commandPalette = new CommandPaletteService(commandRegistry, { i18n: i18nService });
   const commandPaletteController = new CommandPaletteController(commandPalette, commandRegistry);
@@ -112,6 +115,7 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
     settingsService,
     settingsEditorService,
     privacyCenterService,
+    panelHostService,
     debugSessionStore,
     launchConfigurationEditorService,
     themeRuntime
@@ -119,6 +123,7 @@ export function createWorkbenchBootstrapContext(): WorkbenchBootstrapContext {
 }
 
 export function disposeWorkbenchBootstrapContext(context: WorkbenchBootstrapContext) {
+  context.panelHostService.dispose();
   context.debugSessionStore.dispose();
   context.workspaceStateService.dispose();
   context.layoutHandle.dispose();

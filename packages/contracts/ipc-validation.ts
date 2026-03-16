@@ -1,6 +1,8 @@
 import type {
   LlamaControllerBenchmarkRequest,
   LlamaControllerHealthRequest,
+  LlamaModelImportRequest,
+  LlamaModelListRequest,
   LlamaControllerStartPayload,
   LlamaControllerStopPayload,
   CopyEntriesPayload,
@@ -162,6 +164,20 @@ const payloadValidators = {
     return {
       iterations: readInteger(value, 'iterations', { optional: true, min: 1, max: 100 }),
       warmupIterations: readInteger(value, 'warmupIterations', { optional: true, min: 0, max: 20 })
+    };
+  },
+  'nexus:ai:model:list': (payload: unknown): LlamaModelListRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      refresh: readBoolean(value, 'refresh', { optional: true })
+    };
+  },
+  'nexus:ai:model:import': (payload: unknown): LlamaModelImportRequest => {
+    const value = asObject(payload, 'payload');
+    return {
+      sourcePath: readString(value, 'sourcePath', { minLength: 1 }),
+      mode: readEnum(value, 'mode', ['copy', 'move'] as const, { optional: true }),
+      label: readString(value, 'label', { optional: true, allowEmpty: false })
     };
   },
   'nexus:open-workspace': (payload: unknown): OpenWorkspacePayload => {

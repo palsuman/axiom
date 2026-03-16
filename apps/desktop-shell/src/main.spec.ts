@@ -334,6 +334,27 @@ jest.mock('./ai/llama-controller-service', () => {
   };
 });
 
+jest.mock('./ai/llama-model-registry-service', () => {
+  const state = {
+    listModels: jest.fn().mockResolvedValue({
+      modelRoot: '/tmp/.nexus/ai/models',
+      registryPath: '/tmp/.nexus/ai/model-registry.json',
+      discoveredAt: Date.now(),
+      models: []
+    }),
+    importModel: jest.fn().mockResolvedValue({
+      modelRoot: '/tmp/.nexus/ai/models',
+      imported: [],
+      skipped: []
+    })
+  };
+
+  return {
+    __mock: state,
+    LlamaModelRegistryService: jest.fn().mockImplementation(() => state)
+  };
+});
+
 jest.mock('./workspace/workspace-dialog', () => ({
   pickWorkspaceDirectory: jest.fn().mockResolvedValue(undefined)
 }));
@@ -510,6 +531,8 @@ describe('desktop shell main process', () => {
     expect(typeof electron.getHandle('nexus:ai:controller:start')).toBe('function');
     expect(typeof electron.getHandle('nexus:ai:controller:stop')).toBe('function');
     expect(typeof electron.getHandle('nexus:ai:controller:benchmark')).toBe('function');
+    expect(typeof electron.getHandle('nexus:ai:model:list')).toBe('function');
+    expect(typeof electron.getHandle('nexus:ai:model:import')).toBe('function');
     expect(typeof electron.getOn('nexus:log')).toBe('function');
   });
 
@@ -658,6 +681,25 @@ describe('desktop shell main process', () => {
     });
     expect(controller.__mock.stop).toHaveBeenCalledWith({ force: true });
     expect(controller.__mock.benchmark).toHaveBeenCalledWith({ iterations: 4, warmupIterations: undefined });
+  });
+
+  it('routes AI model registry IPC calls through the model registry service', async () => {
+    const registry = jest.requireMock('./ai/llama-model-registry-service') as {
+      __mock: {
+        listModels: jest.Mock;
+        importModel: jest.Mock;
+      };
+    };
+
+    electron.getHandle('nexus:ai:model:list')({}, { refresh: true });
+    electron.getHandle('nexus:ai:model:import')({}, { sourcePath: '/models', mode: 'copy', label: 'DeepSeek' });
+
+    expect(registry.__mock.listModels).toHaveBeenCalledWith({ refresh: true });
+    expect(registry.__mock.importModel).toHaveBeenCalledWith({
+      sourcePath: '/models',
+      mode: 'copy',
+      label: 'DeepSeek'
+    });
   });
 
   it('routes privacy IPC calls through the privacy service', async () => {

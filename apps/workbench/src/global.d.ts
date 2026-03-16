@@ -15,6 +15,10 @@ import type {
   LlamaControllerBenchmarkResponse,
   LlamaControllerHealthRequest,
   LlamaControllerHealthResponse,
+  LlamaModelImportRequest,
+  LlamaModelImportResponse,
+  LlamaModelListRequest,
+  LlamaModelListResponse,
   LlamaControllerStartPayload,
   LlamaControllerStopPayload,
   GitCommitPayload,
@@ -72,6 +76,8 @@ type NexusBridge = {
   aiControllerStart(payload: LlamaControllerStartPayload): Promise<LlamaControllerHealthResponse>;
   aiControllerStop(payload?: LlamaControllerStopPayload): Promise<LlamaControllerHealthResponse>;
   aiControllerBenchmark(payload?: LlamaControllerBenchmarkRequest): Promise<LlamaControllerBenchmarkResponse>;
+  aiModelList(payload?: LlamaModelListRequest): Promise<LlamaModelListResponse>;
+  aiModelImport(payload: LlamaModelImportRequest): Promise<LlamaModelImportResponse>;
   fsCreateEntry(payload: CreateEntryPayload): Promise<FsOperationResponse>;
   fsRenameEntry(payload: RenameEntryPayload): Promise<FsOperationResponse>;
   fsMoveEntries(payload: MoveEntriesPayload): Promise<FsOperationResponse>;

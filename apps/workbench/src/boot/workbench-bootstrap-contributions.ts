@@ -9,6 +9,11 @@ import type { LaunchConfigurationEditorService } from '../run-debug/launch-confi
 import type { PrivacyCenterService } from '../observability/privacy-center-service';
 import type { WorkspaceService } from '../workspace/workspace-service';
 import type { GitStatusStore } from '../scm/git-status-store';
+import {
+  createDefaultPanelActions,
+  createProblemSummary,
+  type PanelHostService
+} from '../shell/panel-host-service';
 
 export type WorkbenchContributionBindings = {
   dispose: () => void;
@@ -23,9 +28,10 @@ export function registerWorkbenchContributions(options: {
   i18nService: I18nService;
   settingsEditorService: SettingsEditorService;
   privacyCenterService: PrivacyCenterService;
+  panelHostService: PanelHostService;
   launchConfigurationEditorService: LaunchConfigurationEditorService;
 }): WorkbenchContributionBindings {
-  registerWorkbenchStructure(options.shell);
+  registerWorkbenchStructure(options.shell, options.panelHostService);
   registerQuickOpenProviders(
     options.commandPalette,
     options.workspaceService,
@@ -103,14 +109,52 @@ export function registerWorkbenchContributions(options: {
   };
 }
 
-function registerWorkbenchStructure(shell: WorkbenchShell) {
+function registerWorkbenchStructure(shell: WorkbenchShell, panelHostService: PanelHostService) {
   DEFAULT_ACTIVITY_ITEMS.forEach(activity => shell.registerActivity(activity));
   shell.registerSidebarView({ id: 'view.explorer', title: 'Explorer', order: 1, containerId: 'activity.explorer' });
   shell.registerSidebarView({ id: 'view.search', title: 'Search', order: 2, containerId: 'activity.search' });
   shell.registerSidebarView({ id: 'view.git', title: 'Source Control', order: 3, containerId: 'activity.git' });
   shell.registerSidebarView({ id: 'view.run', title: 'Run & Debug', order: 4, containerId: 'activity.run' });
-  shell.registerPanelView({ id: 'panel.terminal', title: 'Terminal', order: 1 });
-  shell.registerPanelView({ id: 'panel.output', title: 'Output', order: 2 });
+
+  panelHostService.registerContribution({
+    id: 'panel.terminal',
+    title: 'Terminal',
+    order: 1,
+    render: () => ({
+      kind: 'terminal',
+      title: 'Integrated Terminal',
+      description: 'PTY-backed shell sessions appear here.',
+      actions: createDefaultPanelActions()
+    })
+  });
+  panelHostService.registerContribution({
+    id: 'panel.output',
+    title: 'Output',
+    order: 2,
+    render: context => ({
+      kind: 'output',
+      title: 'Output',
+      channels: context.outputChannels,
+      activeChannelId: context.activeOutputChannelId,
+      actions: createDefaultPanelActions()
+    })
+  });
+  panelHostService.registerContribution({
+    id: 'panel.problems',
+    title: 'Problems',
+    order: 3,
+    render: context => ({
+      kind: 'problems',
+      title: 'Problems',
+      summary: createProblemSummary(context.problems),
+      entries: context.problems,
+      actions: createDefaultPanelActions()
+    })
+  });
+
+  panelHostService.appendOutputEntry('workbench', 'Workbench', 'Panel host initialized.');
+  panelHostService.appendOutputEntry('extensions', 'Extensions', 'No extension panels registered yet.');
+  panelHostService.replaceProblems([]);
 }
 
 function registerQuickOpenProviders(

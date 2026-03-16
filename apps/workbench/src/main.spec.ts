@@ -157,6 +157,17 @@ function createNexusBridge() {
         failures: 3
       }
     }),
+    aiModelList: jest.fn().mockResolvedValue({
+      modelRoot: '/tmp/.nexus/ai/models',
+      registryPath: '/tmp/.nexus/ai/model-registry.json',
+      discoveredAt: Date.now(),
+      models: []
+    }),
+    aiModelImport: jest.fn().mockResolvedValue({
+      modelRoot: '/tmp/.nexus/ai/models',
+      imported: [],
+      skipped: []
+    }),
     fsCreateEntry: jest.fn().mockResolvedValue({ paths: [] }),
     fsRenameEntry: jest.fn().mockResolvedValue({ paths: [] }),
     fsMoveEntries: jest.fn().mockResolvedValue({ paths: [] }),
@@ -309,6 +320,9 @@ describe('workbench shell bootstrap', () => {
     expect(Array.isArray(paletteResults.items)).toBe(true);
     await module.commandRegistry.executeCommand('nexus.commandPalette.show');
     expect(module.commandPaletteController.getSnapshot().open).toBe(true);
+    expect(module.panelHostService.renderPanel('panel.output')).toMatchObject({
+      kind: 'output'
+    });
     expect(module.settingsService.get('files.encoding')).toBe('utf8');
     await expect(module.commandRegistry.executeCommand('nexus.status.encoding')).resolves.toBe('utf8');
     await module.commandRegistry.executeCommand('nexus.locale.switch', { locale: 'fr-FR' });
@@ -343,6 +357,16 @@ describe('workbench shell bootstrap', () => {
     expect((runSnapshot as { editorResource: string }).editorResource).toBe('run-config://form');
     const runItems = await module.commandPalette.search('launch');
     expect(runItems.items.some((item: { id: string }) => item.id.startsWith('run-config:'))).toBe(true);
+    await module.commandRegistry.executeCommand('nexus.panel.focusProblems');
+    expect(module.shell.layoutSnapshot().panel.activeViewId).toBe('panel.problems');
+    await module.commandRegistry.executeCommand('nexus.panel.position.right');
+    expect(module.shell.layoutSnapshot().panel.position).toBe('right');
+    expect(module.panelHostService.renderActivePanel()).toMatchObject({
+      kind: 'problems',
+      summary: 'No problems detected.'
+    });
     expect(typeof globalWindow.window?.nexus?.aiControllerGetHealth).toBe('function');
+    expect(typeof globalWindow.window?.nexus?.aiModelList).toBe('function');
+    expect(typeof globalWindow.window?.nexus?.aiModelImport).toBe('function');
   });
 });

@@ -121,6 +121,35 @@ describe('ipc-validation', () => {
     ).toThrow(IpcValidationError);
   });
 
+  it('validates llama.cpp model list and import payloads', () => {
+    const listPayload = validateIpcPayload('nexus:ai:model:list', {
+      refresh: true
+    });
+    const importPayload = validateIpcPayload('nexus:ai:model:import', {
+      sourcePath: '  /models/deepseek  ',
+      mode: 'copy',
+      label: '  DeepSeek R1  '
+    });
+
+    expect(listPayload).toEqual({
+      refresh: true
+    });
+    expect(importPayload).toEqual({
+      sourcePath: '/models/deepseek',
+      mode: 'copy',
+      label: 'DeepSeek R1'
+    });
+  });
+
+  it('rejects malformed llama.cpp model import payloads', () => {
+    expect(() =>
+      validateIpcPayload('nexus:ai:model:import', {
+        sourcePath: '',
+        mode: 'link'
+      })
+    ).toThrow(IpcValidationError);
+  });
+
   it('rejects invalid telemetry attributes', () => {
     expect(() =>
       validateIpcPayload('nexus:telemetry:track', {

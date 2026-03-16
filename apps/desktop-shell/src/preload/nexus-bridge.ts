@@ -18,6 +18,10 @@ import type {
   LlamaControllerBenchmarkResponse,
   LlamaControllerHealthRequest,
   LlamaControllerHealthResponse,
+  LlamaModelImportRequest,
+  LlamaModelImportResponse,
+  LlamaModelListRequest,
+  LlamaModelListResponse,
   LlamaControllerStartPayload,
   LlamaControllerStopPayload,
   GitCommitPayload,
@@ -123,6 +127,12 @@ const api = {
     payload: LlamaControllerBenchmarkRequest = {}
   ): Promise<LlamaControllerBenchmarkResponse> {
     return ipcRenderer.invoke('nexus:ai:controller:benchmark', payload);
+  },
+  async aiModelList(payload: LlamaModelListRequest = {}): Promise<LlamaModelListResponse> {
+    return ipcRenderer.invoke('nexus:ai:model:list', payload);
+  },
+  async aiModelImport(payload: LlamaModelImportRequest): Promise<LlamaModelImportResponse> {
+    return ipcRenderer.invoke('nexus:ai:model:import', payload);
   },
   async openNewWindow() {
     return ipcRenderer.invoke('nexus:new-window');

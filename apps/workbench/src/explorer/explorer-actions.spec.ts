@@ -37,6 +37,8 @@ function createBridge() {
     aiControllerStart: jest.fn(),
     aiControllerStop: jest.fn(),
     aiControllerBenchmark: jest.fn(),
+    aiModelList: jest.fn(),
+    aiModelImport: jest.fn(),
     fsCreateEntry: jest.fn().mockResolvedValue(resolved),
     fsRenameEntry: jest.fn().mockResolvedValue(resolved),
     fsMoveEntries: jest.fn().mockResolvedValue(resolved),

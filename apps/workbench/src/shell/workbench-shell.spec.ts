@@ -122,4 +122,18 @@ describe('WorkbenchShell', () => {
     expect(snapshot.sidebar.activeViewId).toBe('view.tests');
     expect(snapshot.panel.activeViewId).toBe('panel.logs');
   });
+
+  it('unregisters panel views and reassigns the active panel when needed', () => {
+    const shell = new WorkbenchShell();
+    shell.registerPanelView({ id: 'panel.output', title: 'Output', order: 1 });
+    shell.registerPanelView({ id: 'panel.problems', title: 'Problems', order: 2 });
+    shell.setActivePanelView('panel.problems');
+
+    expect(shell.unregisterPanelView('panel.problems')).toBe(true);
+    expect(shell.unregisterPanelView('panel.unknown')).toBe(false);
+
+    const snapshot = shell.layoutSnapshot();
+    expect(snapshot.panel.views.some(view => view.id === 'panel.problems')).toBe(false);
+    expect(snapshot.panel.activeViewId).toBe('panel.output');
+  });
 });

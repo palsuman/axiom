@@ -144,6 +144,20 @@ export class WorkbenchShell {
     this.emitChange('panel');
   }
 
+  unregisterPanelView(viewId: string) {
+    const bucket = this.state.panel;
+    const nextViews = bucket.views.filter(view => view.id !== viewId);
+    if (nextViews.length === bucket.views.length) {
+      return false;
+    }
+    bucket.views = nextViews;
+    if (bucket.activeViewId === viewId) {
+      bucket.activeViewId = bucket.views[0]?.id;
+    }
+    this.emitChange('panel');
+    return true;
+  }
+
   setActiveSidebarView(viewId: string, target: 'primary' | 'secondary' = 'primary') {
     const bucket = target === 'primary' ? this.state.sidebar : this.state.secondarySidebar;
     if (!bucket.views.some(view => view.id === viewId)) {

@@ -206,6 +206,61 @@ export function registerWorkbenchCommands(context: WorkbenchBootstrapContext) {
   });
 
   context.commandRegistry.register({
+    id: 'nexus.panel.focusTerminal',
+    title: 'Focus Terminal Panel',
+    category: 'View',
+    handler: () => {
+      context.shell.togglePanelVisibility(true);
+      context.shell.setActivePanelView('panel.terminal');
+      return context.panelHostService.renderPanel('panel.terminal');
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.panel.focusOutput',
+    title: 'Focus Output Panel',
+    category: 'View',
+    handler: () => {
+      context.shell.togglePanelVisibility(true);
+      context.shell.setActivePanelView('panel.output');
+      return context.panelHostService.renderPanel('panel.output');
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.panel.focusProblems',
+    title: 'Focus Problems Panel',
+    category: 'View',
+    handler: () => {
+      context.shell.togglePanelVisibility(true);
+      context.shell.setActivePanelView('panel.problems');
+      return context.panelHostService.renderPanel('panel.problems');
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.panel.position.bottom',
+    title: 'Dock Panel to Bottom',
+    category: 'View',
+    handler: () => {
+      context.shell.togglePanelVisibility(true);
+      context.shell.setPanelPosition('bottom');
+      return context.shell.layoutSnapshot().panel;
+    }
+  });
+
+  context.commandRegistry.register({
+    id: 'nexus.panel.position.right',
+    title: 'Dock Panel to Right',
+    category: 'View',
+    handler: () => {
+      context.shell.togglePanelVisibility(true);
+      context.shell.setPanelPosition('right');
+      return context.shell.layoutSnapshot().panel;
+    }
+  });
+
+  context.commandRegistry.register({
     id: 'nexus.sidebar.toggle',
     title: t('command.sidebar.toggle', 'Toggle Sidebar'),
     category: 'View',

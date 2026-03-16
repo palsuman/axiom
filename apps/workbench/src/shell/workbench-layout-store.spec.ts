@@ -30,6 +30,8 @@ describe('WorkbenchLayoutStore', () => {
 
   it('bootstrap helper wires persistence listeners', () => {
     const handle = bootstrapPersistentWorkbenchShell({ workspaceId: 'project-alpha', dataRoot: tempDir });
+    handle.shell.registerPanelView({ id: 'panel.problems', title: 'Problems', order: 2 });
+    handle.shell.setActivePanelView('panel.problems');
     handle.shell.setPanelPosition('right');
     handle.shell.setPanelSize(360);
     handle.shell.togglePanelVisibility(true);
@@ -37,5 +39,6 @@ describe('WorkbenchLayoutStore', () => {
     const snapshot = handle.store.loadState();
     expect(snapshot?.panel.position).toBe('right');
     expect(snapshot?.panel.size).toBe(360);
+    expect(snapshot?.panel.activeViewId).toBe('panel.problems');
   });
 });

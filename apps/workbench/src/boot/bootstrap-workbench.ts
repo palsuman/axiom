@@ -12,6 +12,7 @@ const contributionBindings = registerWorkbenchContributions({
   i18nService: context.i18nService,
   settingsEditorService: context.settingsEditorService,
   privacyCenterService: context.privacyCenterService,
+  panelHostService: context.panelHostService,
   launchConfigurationEditorService: context.launchConfigurationEditorService
 });
 registerWorkbenchCommands(context);
@@ -34,6 +35,7 @@ const debugSessionStore = context.debugSessionStore;
 const settingsService = context.settingsService;
 const settingsEditorService = context.settingsEditorService;
 const privacyCenterService = context.privacyCenterService;
+const panelHostService = context.panelHostService;
 const launchConfigurationEditorService = context.launchConfigurationEditorService;
 const i18nService = context.i18nService;
 
@@ -51,6 +53,7 @@ export {
   settingsService,
   settingsEditorService,
   privacyCenterService,
+  panelHostService,
   launchConfigurationEditorService,
   i18nService
 };

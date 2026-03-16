@@ -3,6 +3,12 @@ import { createRequire } from 'node:module';
 import type { WorkbenchShell, WorkbenchSnapshot } from './workbench-shell';
 import type { CommandRegistry } from '../commands/command-registry';
 import type {
+  OutputChannelSnapshot,
+  PanelContent,
+  PanelHostService,
+  ProblemEntry
+} from './panel-host-service';
+import type {
   CommandPaletteController,
   CommandPaletteControllerSnapshot
 } from '../commands/command-palette-controller';
@@ -58,6 +64,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     shell,
     commandRegistry,
     commandPaletteController,
+    panelHostService,
     gitStatusStore,
     gitCommitStore,
     gitHistoryStore,
@@ -104,7 +111,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
       commandRegistry,
       labels
     );
-    renderPanel(elements, snapshot, labels);
+    renderPanel(elements, snapshot, labels, panelHostService);
     renderStatusBar(elements.statusBar, snapshot, commandRegistry, i18nService, labels);
     elements.announcer.textContent = buildWorkbenchLiveRegionMessage(snapshot, i18nService);
     if (commandPaletteSnapshot.open) {
@@ -126,6 +133,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
   const disposers = [
     shell.onLayoutChange(() => render()),
     commandPaletteController.onDidChange(() => render()),
+    panelHostService.onDidChange(() => render()),
     gitStatusStore.onDidChange(() => render()),
     gitCommitStore.onDidChange(() => render()),
     gitHistoryStore.onDidChange(() => render()),
@@ -141,6 +149,7 @@ export function mountWorkbenchDom(container: HTMLElement = document.body): Mount
     shell,
     commandRegistry,
     commandPaletteController,
+    panelHostService,
     settingsEditorService,
     privacyCenterService,
     launchConfigurationEditorService,
@@ -244,6 +253,7 @@ function bindWorkbenchEvents(
   shell: WorkbenchShell,
   commandRegistry: CommandRegistry,
   commandPaletteController: CommandPaletteController,
+  panelHostService: PanelHostService,
   settingsEditorService: SettingsEditorService,
   privacyCenterService: PrivacyCenterService,
   launchConfigurationEditorService: LaunchConfigurationEditorService,
@@ -287,7 +297,21 @@ function bindWorkbenchEvents(
         break;
       case 'panel-view':
         if (target.dataset.viewId) {
+          shell.togglePanelVisibility(true);
           shell.setActivePanelView(target.dataset.viewId);
+        }
+        break;
+      case 'panel-output-channel':
+        panelHostService.setActiveOutputChannel(target.dataset.channelId);
+        break;
+      case 'panel-problem-open':
+        if (target.dataset.resource) {
+          const title = target.dataset.resource.split('/').pop() ?? 'Problem Source';
+          shell.openEditor({
+            title,
+            resource: target.dataset.resource,
+            kind: 'text'
+          });
         }
         break;
       case 'editor-tab':
@@ -890,9 +914,15 @@ function renderEditors(
   void commandRegistry;
 }
 
-function renderPanel(elements: RendererElements, snapshot: WorkbenchSnapshot, labels: WorkbenchAccessibilityLabels) {
+function renderPanel(
+  elements: RendererElements,
+  snapshot: WorkbenchSnapshot,
+  labels: WorkbenchAccessibilityLabels,
+  panelHostService: PanelHostService
+) {
   const activeViewId = snapshot.panel.activeViewId ?? 'panel.output';
   const activeViewTitle = snapshot.panel.views.find(view => view.id === activeViewId)?.title ?? 'Panel';
+  const panelContent = panelHostService.renderPanel(activeViewId);
   elements.panel.setAttribute('aria-label', labels.panel);
   elements.panelTabs.innerHTML = snapshot.panel.views
     .map(
@@ -918,23 +948,159 @@ function renderPanel(elements: RendererElements, snapshot: WorkbenchSnapshot, la
   elements.panelBody.setAttribute('role', 'region');
   elements.panelBody.setAttribute('tabindex', '-1');
   elements.panelBody.setAttribute('aria-label', activeViewTitle);
+  elements.panelBody.innerHTML = renderPanelBody(panelContent);
 
-  if (activeViewId === 'panel.terminal') {
-    elements.panelBody.innerHTML = `
-      <div class="nexus-panel-terminal-shell">
-        <div class="nexus-panel-toolbar">
-          <span class="nexus-muted">Integrated Terminal</span>
-        </div>
-      </div>
-    `;
+  if (panelContent.kind === 'terminal') {
     elements.panelBody.querySelector('.nexus-panel-terminal-shell')?.appendChild(elements.terminalHost);
-  } else {
-    elements.panelBody.innerHTML = `
+  }
+}
+
+function renderPanelBody(content: PanelContent) {
+  switch (content.kind) {
+    case 'terminal':
+      return `
+        <div class="nexus-panel-terminal-shell">
+          ${renderPanelToolbar(content.actions)}
+          <div class="nexus-panel-toolbar">
+            <span class="nexus-muted">${escapeHtml(content.description ?? content.title)}</span>
+          </div>
+        </div>
+      `;
+    case 'output':
+      return renderOutputPanel(content.channels, content.activeChannelId, content.actions);
+    case 'problems':
+      return renderProblemsPanel(content.summary, content.entries, content.actions);
+    case 'empty':
+      return `
+        <div class="nexus-panel-output">
+          ${renderPanelToolbar(content.actions)}
+          <p class="nexus-muted">${escapeHtml(content.message)}</p>
+        </div>
+      `;
+    default:
+      return `<div class="nexus-panel-output"><p class="nexus-muted">Unsupported panel content.</p></div>`;
+  }
+}
+
+function renderPanelToolbar(actions: PanelContent['actions']) {
+  if (!actions?.length) {
+    return '';
+  }
+  return `
+    <div class="nexus-panel-toolbar nexus-inline-actions">
+      ${actions
+        .map(
+          action => `
+            <button
+              type="button"
+              class="${action.variant === 'primary' ? 'nexus-primary-button' : 'nexus-ghost-button'}"
+              data-action="command"
+              data-command-id="${escapeHtml(action.commandId)}"
+              data-command-args="${escapeHtml(JSON.stringify(action.args ?? {}))}"
+            >
+              ${escapeHtml(action.label)}
+            </button>
+          `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function renderOutputPanel(
+  channels: OutputChannelSnapshot[],
+  activeChannelId: string | undefined,
+  actions: PanelContent['actions']
+) {
+  if (!channels.length) {
+    return `
       <div class="nexus-panel-output">
-        <p class="nexus-muted">Output channels will appear here.</p>
+        ${renderPanelToolbar(actions)}
+        <p class="nexus-muted">No output channels have emitted data yet.</p>
       </div>
     `;
   }
+
+  const activeChannel = channels.find(channel => channel.id === activeChannelId) ?? channels[0];
+  return `
+    <div class="nexus-panel-output">
+      ${renderPanelToolbar(actions)}
+      <div class="nexus-inline-actions nexus-output-channel-tabs">
+        ${channels
+          .map(
+            channel => `
+              <button
+                type="button"
+                class="nexus-tab-button${channel.id === activeChannel.id ? ' is-active' : ''}"
+                data-action="panel-output-channel"
+                data-channel-id="${escapeHtml(channel.id)}"
+              >
+                ${escapeHtml(channel.label)}
+              </button>
+            `
+          )
+          .join('')}
+      </div>
+      <div class="nexus-list">
+        ${activeChannel.entries
+          .slice()
+          .reverse()
+          .map(
+            entry => `
+              <div class="nexus-list-item nexus-output-entry nexus-output-entry-${escapeHtml(entry.level)}">
+                <span>${escapeHtml(entry.text)}</span>
+                <span class="nexus-muted">${escapeHtml(new Date(entry.timestamp).toLocaleTimeString())}</span>
+              </div>
+            `
+          )
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderProblemsPanel(summary: string, entries: ProblemEntry[], actions: PanelContent['actions']) {
+  return `
+    <div class="nexus-panel-output">
+      ${renderPanelToolbar(actions)}
+      <div class="nexus-card">
+        <strong>${escapeHtml(summary)}</strong>
+      </div>
+      ${
+        entries.length
+          ? `<div class="nexus-list">
+              ${entries
+                .map(
+                  entry => `
+                    <button
+                      type="button"
+                      class="nexus-list-item nexus-list-item-button nexus-problem-entry nexus-problem-entry-${escapeHtml(entry.severity)}"
+                      data-action="${entry.resource ? 'panel-problem-open' : 'noop'}"
+                      ${entry.resource ? `data-resource="${escapeHtml(entry.resource)}"` : ''}
+                    >
+                      <span>
+                        <strong>${escapeHtml(entry.message)}</strong>
+                        <span class="nexus-muted">${escapeHtml(renderProblemLocation(entry))}</span>
+                      </span>
+                      <span class="nexus-muted">${escapeHtml(entry.source ?? entry.severity)}</span>
+                    </button>
+                  `
+                )
+                .join('')}
+            </div>`
+          : '<p class="nexus-muted">No problems to display.</p>'
+      }
+    </div>
+  `;
+}
+
+function renderProblemLocation(entry: ProblemEntry) {
+  if (!entry.resource) {
+    return 'Workspace-wide';
+  }
+  const resourceLabel = entry.resource.split('/').pop() ?? entry.resource;
+  const lineSegment = entry.line ? `:${entry.line}${entry.column ? `:${entry.column}` : ''}` : '';
+  return `${resourceLabel}${lineSegment}`;
 }
 
 function renderStatusBar(
@@ -2501,6 +2667,25 @@ function injectWorkbenchStyles() {
     .nexus-list {
       display: grid;
       gap: 12px;
+    }
+    .nexus-output-channel-tabs {
+      margin-bottom: 4px;
+    }
+    .nexus-output-entry,
+    .nexus-problem-entry {
+      align-items: flex-start;
+    }
+    .nexus-output-entry-info,
+    .nexus-problem-entry-info {
+      border-left: 3px solid color-mix(in srgb, var(--nexus-button-background, #2d6cdf) 45%, transparent);
+    }
+    .nexus-output-entry-warning,
+    .nexus-problem-entry-warning {
+      border-left: 3px solid #d8a441;
+    }
+    .nexus-output-entry-error,
+    .nexus-problem-entry-error {
+      border-left: 3px solid #d35d6e;
     }
     .nexus-list-item-meta,
     .nexus-run-config-field,

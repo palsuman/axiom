@@ -7,6 +7,7 @@ This document is the authoritative contract for the Nexus workbench shell UI pri
 The current shell contract covers:
 
 - persistent workbench layout state for activity bar, sidebars, editor groups, panel, and status bar
+- a declarative panel host used for terminal, output, problems, and future extension-contributed panels
 - shell-level accessibility labels and roving-toolbar keyboard behavior
 - the command palette and quick open surface used for command execution and navigation entry points
 
@@ -24,6 +25,8 @@ Related subsystem docs:
   - persisted shell layout snapshot storage
 - `apps/workbench/src/shell/workbench-dom-renderer.ts`
   - renderer DOM mount, interaction wiring, and command palette shell
+- `apps/workbench/src/shell/panel-host-service.ts`
+  - declarative panel contribution registry and built-in panel content models
 - `apps/workbench/src/commands/command-registry.ts`
   - typed command registration and execution contract
 - `apps/workbench/src/commands/command-palette.ts`
@@ -53,11 +56,36 @@ Current first-party providers:
 
 Extension-contributed palette entries remain future work under the extension-platform tasks.
 
+## Panel Host Contract
+
+`IDE-147` introduces the workbench panel host abstraction.
+
+Behavior:
+
+- Panels are registered declaratively through `PanelHostService.registerContribution(...)`.
+- Registration updates the shared shell panel tabs using the same `PanelViewRegistration` contract consumed by the workbench layout state.
+- Panel docking remains owned by `WorkbenchShell`, so switching bottom/right positions and the active panel persists through the existing layout store.
+- Built-in panel contributions now cover:
+  - `panel.terminal`
+  - `panel.output`
+  - `panel.problems`
+
+Current panel commands:
+
+- `nexus.panel.focusTerminal`
+- `nexus.panel.focusOutput`
+- `nexus.panel.focusProblems`
+- `nexus.panel.position.bottom`
+- `nexus.panel.position.right`
+
+The panel host is the renderer-facing contract that future extension manifests and contribution APIs should target when panel contributions are surfaced through the extension platform.
+
 ## Verification
 
 Targeted verification:
 
 - `./node_modules/.bin/jest --config apps/workbench/jest.config.cjs --runInBand apps/workbench/src/commands/command-palette.spec.ts apps/workbench/src/commands/command-palette-controller.spec.ts apps/workbench/src/main.spec.ts`
+- `./node_modules/.bin/jest --config apps/workbench/jest.config.cjs --runInBand apps/workbench/src/shell/panel-host-service.spec.ts apps/workbench/src/shell/workbench-layout-store.spec.ts apps/workbench/src/main.spec.ts`
 
 Broader workbench verification:
 

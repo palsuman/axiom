@@ -13,6 +13,8 @@ export type CoreChannel =
   | 'nexus:ai:controller:start'
   | 'nexus:ai:controller:stop'
   | 'nexus:ai:controller:benchmark'
+  | 'nexus:ai:model:list'
+  | 'nexus:ai:model:import'
   | 'nexus:new-window'
   | 'nexus:get-window-session'
   | 'nexus:open-workspace'
@@ -308,6 +310,52 @@ export type LlamaControllerBenchmarkResponse = {
   endpoint: string;
   samples: LlamaControllerBenchmarkSample[];
   summary: LlamaControllerBenchmarkSummary;
+};
+
+export type LlamaModelListRequest = {
+  refresh?: boolean;
+};
+
+export type LlamaModelImportMode = 'copy' | 'move';
+
+export type LlamaModelImportRequest = {
+  sourcePath: string;
+  mode?: LlamaModelImportMode;
+  label?: string;
+};
+
+export type LlamaModelSource = 'discovered' | 'imported';
+
+export type LlamaModelRecord = {
+  id: string;
+  path: string;
+  relativePath: string;
+  fileName: string;
+  displayName: string;
+  source: LlamaModelSource;
+  format: 'gguf';
+  sizeBytes: number;
+  modifiedAt: number;
+  importedAt?: number;
+  sourcePath?: string;
+  family?: string;
+  parameterScale?: string;
+  quantization?: string;
+  ready: boolean;
+  issues: string[];
+};
+
+export type LlamaModelListResponse = {
+  modelRoot: string;
+  registryPath: string;
+  discoveredAt: number;
+  models: LlamaModelRecord[];
+};
+
+export type LlamaModelImportResponse = {
+  modelRoot: string;
+  imported: LlamaModelRecord[];
+  skipped: string[];
 };
 
 export type WindowSessionMetadata = {

@@ -138,6 +138,7 @@
   - `settings/settings-editor-service.ts` for searchable form/JSON settings editor state and scope-aware workbench commands
   - `shell/workbench-shell.ts` as a facade over shell state, layout, and notification helpers
   - `shell/workbench-dom-renderer.ts` for DOM mounting of the current workbench shell inside Electron
+  - `shell/panel-host-service.ts` for declarative panel contribution registration and built-in output/problems panel state
   - `shell/workbench-shell-contract.ts`, `shell/workbench-shell-state.ts`, and `shell/workbench-shell-layout.ts` for focused shell internals
 - App roots should not become feature buckets. If a subsystem grows beyond a single file, create a domain folder before the layout drifts.
 - Run / Debug / Test documentation lives in `docs/run-debug-test/README.md`, which is the authoritative contract for `launch.json`, debug-session IPC/event channels, and verification commands.

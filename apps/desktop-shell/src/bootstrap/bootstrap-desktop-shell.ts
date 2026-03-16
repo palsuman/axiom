@@ -14,6 +14,7 @@ import { loadWorkspaceDescriptor } from '@nexus/platform/workspace/workspace-des
 import { WorkspaceBackupManager } from '@nexus/platform/workspace/workspace-backup';
 import { TelemetryStore } from '@nexus/platform/observability/telemetry-store';
 import { LlamaControllerService } from '../ai/llama-controller-service';
+import { LlamaModelRegistryService } from '../ai/llama-model-registry-service';
 import { FileOperationsService } from '../filesystem/file-operations';
 import { DebugAdapterHostService } from '../run-debug/debug-adapter-host-service';
 import { LaunchConfigurationService } from '../run-debug/launch-configuration-service';
@@ -72,6 +73,9 @@ const crashService = new CrashService(env, windowManager, {
 });
 const startupMetrics = new StartupMetrics(env, undefined, telemetryService);
 const llamaControllerService = new LlamaControllerService(env, {
+  telemetry: telemetryService
+});
+const llamaModelRegistryService = new LlamaModelRegistryService(env, {
   telemetry: telemetryService
 });
 const workspaceHistory = new WorkspaceHistoryStore({
@@ -167,6 +171,12 @@ function registerIpcHandlers() {
     llamaControllerService.benchmark(
       payload === undefined ? {} : requireValidPayload('nexus:ai:controller:benchmark', payload)
     )
+  );
+  ipcMain.handle('nexus:ai:model:list', (_event, payload) =>
+    llamaModelRegistryService.listModels(payload === undefined ? {} : requireValidPayload('nexus:ai:model:list', payload))
+  );
+  ipcMain.handle('nexus:ai:model:import', (_event, payload) =>
+    llamaModelRegistryService.importModel(requireValidPayload('nexus:ai:model:import', payload))
   );
 
   ipcMain.handle('nexus:new-window', () => {
